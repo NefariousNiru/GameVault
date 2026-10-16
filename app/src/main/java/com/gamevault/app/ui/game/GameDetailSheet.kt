@@ -2,6 +2,9 @@ package com.gamevault.app.ui.game
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +21,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -46,6 +50,7 @@ import com.gamevault.app.ui.theme.VaultPalettes
 @Composable
 fun GameDetailSheet(game: Game, busy: Boolean, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val draft = game.draft
+    val context = LocalContext.current
     val palette = VaultPalettes.forPlatform(draft.platform)
     var confirmDelete by remember { mutableStateOf(false) }
     if (confirmDelete) {
@@ -85,6 +90,24 @@ fun GameDetailSheet(game: Game, busy: Boolean, onDismiss: () -> Unit, onEdit: ()
                         DetailText("Gameplay", draft.gameplay.label)
                         DetailText("Your rating", draft.rating?.let { "$it / 10" } ?: "Not rated")
                     }
+                }
+                if (draft.developer.isNotBlank()) DetailText("Developer", draft.developer)
+                if (draft.publisher.isNotBlank()) DetailText("Publisher", draft.publisher)
+                if (draft.genres.isNotBlank()) DetailText("Genres", draft.genres)
+                if (draft.supportedPlatforms.isNotBlank()) DetailText("Supported platforms", draft.supportedPlatforms)
+                if (draft.rawgRating != null) DetailText("RAWG community rating", "${draft.rawgRating} / 5")
+                if (draft.description.isNotBlank()) DetailText("About the game", draft.description)
+                if (draft.tags.isNotBlank()) DetailText("Tags", draft.tags)
+                if (draft.rawgId != null) {
+                    TextButton(onClick = {
+                        val uri = Uri.parse("https://rawg.io/games/${Uri.encode(draft.rawgSlug.ifBlank { draft.rawgId.toString() })}")
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    }) { Text("Game information supplied by RAWG · View on RAWG ↗") }
+                }
+                if (draft.steamGridId != null) {
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.steamgriddb.com/game/${draft.steamGridId}")))
+                    }) { Text("Artwork: SteamGridDB ↗") }
                 }
                 DetailText("Acquisition", if (draft.platform == GamePlatform.PC) draft.pcAcquisition.label else "${draft.ps5Acquisition.label} · ${draft.ps5Library.label}")
                 if (draft.completionDate.isNotBlank()) DetailText("Completed on", draft.completionDate)

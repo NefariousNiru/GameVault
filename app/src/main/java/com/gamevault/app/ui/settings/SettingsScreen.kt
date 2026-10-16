@@ -17,6 +17,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import com.gamevault.app.data.catalog.CatalogKeys
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,9 +49,15 @@ fun SettingsScreen(
     message: String?,
     error: String?,
     onVerifyCloud: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    apiKeys: CatalogKeys,
+    apiSettingsError: String?,
+    onSaveApiKeys: (String, String) -> Unit
 ) {
     val palette = VaultPalettes.settings
+    var rawgKey by remember(apiKeys.rawg) { mutableStateOf(apiKeys.rawg) }
+    var steamKey by remember(apiKeys.steamGridDb) { mutableStateOf(apiKeys.steamGridDb) }
+    var revealKeys by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 36.dp),
@@ -70,6 +85,31 @@ fun SettingsScreen(
                     user.email?.let { Text(it, color = VaultMuted, fontSize = 13.sp) }
                     HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
                     Text("Private collection · Firebase Authentication", color = VaultMuted, fontSize = 12.sp)
+                }
+            }
+        }
+        item {
+            GlowCard(palette) {
+                Column(Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("GAME DATABASE APIS", color = palette.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Provide personal API keys once on this device. They are stored only in private app preferences, not Firebase or the source code.",
+                        color = VaultMuted, fontSize = 12.sp)
+                    OutlinedTextField(rawgKey, { rawgKey = it }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text("RAWG API key · required for search") }, singleLine = true,
+                        visualTransformation = if (revealKeys) VisualTransformation.None else PasswordVisualTransformation())
+                    OutlinedTextField(steamKey, { steamKey = it }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text("SteamGridDB API key · optional artwork") }, singleLine = true,
+                        visualTransformation = if (revealKeys) VisualTransformation.None else PasswordVisualTransformation())
+                    TextButton(onClick = { revealKeys = !revealKeys }) {
+                        Text(if (revealKeys) "Hide keys" else "Show keys")
+                    }
+                    Button(onClick = { onSaveApiKeys(rawgKey, steamKey) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Save API credentials")
+                    }
+                    apiSettingsError?.let { Text(it, color = Color(0xFFFFA6A6), fontSize = 12.sp) }
+                    Text("RAWG: rawg.io/apidocs  ·  SteamGridDB: steamgriddb.com/profile/preferences/api",
+                        color = VaultMuted, fontSize = 11.sp)
                 }
             }
         }
@@ -118,6 +158,6 @@ fun SettingsScreen(
                 Text("Sign out")
             }
         }
-        item { Text("GAMEVAULT · PHASE 3.2", color = VaultMuted, fontSize = 10.sp, letterSpacing = 2.sp) }
+        item { Text("GAMEVAULT · PHASE 4", color = VaultMuted, fontSize = 10.sp, letterSpacing = 2.sp) }
     }
 }

@@ -5,5 +5,5 @@ import com.gamevault.app.di.AppContainer
 
 /** Application-wide, lazily initialized dependency container. */
 class GameVaultApplication : Application() {
-    val container: AppContainer by lazy { AppContainer() }
+    val container: AppContainer by lazy { AppContainer(this) }
 }

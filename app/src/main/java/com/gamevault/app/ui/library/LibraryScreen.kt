@@ -1,5 +1,9 @@
 package com.gamevault.app.ui.library
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -68,6 +72,7 @@ fun LibraryScreen(
     onOpen: (Game) -> Unit
 ) {
     val palette = VaultPalettes.forPlatform(platform)
+    val context = LocalContext.current
     var query by rememberSaveable { mutableStateOf("") }
     var viewGrid by rememberSaveable { mutableStateOf(true) }
     var filter by rememberSaveable { mutableStateOf("All") }
@@ -141,6 +146,13 @@ fun LibraryScreen(
                     }
                     FilterChip(selected = sortNewFirst, onClick = { sortNewFirst = !sortNewFirst }, label = { Text(if (sortNewFirst) "Recent ↓" else "A–Z") })
                 }
+            }
+        }
+        if (state.games.any { it.draft.rawgId != null }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                TextButton(onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rawg.io/")))
+                }) { Text("Game metadata supplied by RAWG ↗", fontSize = 12.sp) }
             }
         }
         if (state.loading) {

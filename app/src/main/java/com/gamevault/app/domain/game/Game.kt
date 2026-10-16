@@ -28,7 +28,18 @@ data class GameDraft(
     val completionDate: String = "",
     val coverUrl: String = "",
     val heroUrl: String = "",
-    val queueRank: Long? = null
+    val queueRank: Long? = null,
+    // Catalog metadata is separate from user-owned lifecycle fields.
+    val rawgId: Int? = null,
+    val rawgSlug: String = "",
+    val developer: String = "",
+    val publisher: String = "",
+    val description: String = "",
+    val genres: String = "",
+    val tags: String = "",
+    val supportedPlatforms: String = "",
+    val rawgRating: Double? = null,
+    val steamGridId: Int? = null
 )
 
 data class Game(
@@ -48,6 +59,11 @@ fun GameDraft.validationError(): String? = when {
     notes.length > 10_000 -> "Notes must be 10,000 characters or less"
     releaseDate.length > 32 || completionDate.length > 32 -> "Date text is too long"
     rating != null && rating !in 1..10 -> "Rating must be 1–10"
+    rawgId != null && rawgId <= 0 -> "Invalid RAWG identifier"
+    steamGridId != null && steamGridId <= 0 -> "Invalid SteamGridDB identifier"
+    listOf(rawgSlug, developer, publisher, genres, tags, supportedPlatforms).any { it.length > 2000 } -> "Catalog field too long"
+    description.length > 12000 -> "Description must be 12,000 characters or less"
+    (rawgRating != null && (rawgRating < 0.0 || rawgRating > 5.0)) -> "RAWG rating out of range"
     !validArtworkUrl(coverUrl) || !validArtworkUrl(heroUrl) -> "Artwork links must use HTTPS"
     else -> null
 }

@@ -31,49 +31,81 @@ class FirestoreGameRepository(private val db: FirebaseFirestore) : GameRepositor
         awaitClose { registration.remove() }
     }
 
+    // A catalog ID is unique even if its display title changes or differs by region.
+    private fun catalogClaim(uid: String, id: Int) =
+        db.collection("users").document(uid).collection("catalogClaims").document(id.toString())
+
     override suspend fun create(userId: String, draft: GameDraft) {
         requireValid(draft)
         val key = titleKey(draft.title)
         val gameDoc = games(userId).document(UUID.randomUUID().toString())
-        val claim = titles(userId).document(key)
+        val title = titles(userId).document(key)
+        val rawg = draft.rawgId?.let { catalogClaim(userId, it) }
         db.runTransaction { tx ->
-            if (tx.get(claim).exists()) throw DuplicateGameException()
-            tx.set(claim, mapOf("gameId" to gameDoc.id, "normalizedTitle" to normalizeTitle(draft.title)))
+            if (tx.get(title).exists()) throw DuplicateGameException()
+            if (rawg != null && tx.get(rawg).exists()) throw DuplicateGameException()
+            tx.set(title, mapOf("gameId" to gameDoc.id, "normalizedTitle" to normalizeTitle(draft.title)))
+            if (rawg != null) tx.set(rawg, mapOf("gameId" to gameDoc.id, "rawgId" to draft.rawgId))
             tx.set(gameDoc, draft.fields(gameDoc.id, key))
         }.await()
     }
 
     override suspend fun update(userId: String, game: Game, draft: GameDraft) {
         requireValid(draft)
-        val updatedKey = titleKey(draft.title)
+        val newKey = titleKey(draft.title)
         val gameDoc = games(userId).document(game.id)
-        val oldClaim = titles(userId).document(game.titleKey)
-        if (updatedKey == game.titleKey) {
-            // A normal edit is queued by Firestore when offline.
-            gameDoc.set(draft.fields(game.id, updatedKey)).await()
+        val sameTitle = newKey == game.titleKey
+        val sameCatalog = game.draft.rawgId == draft.rawgId
+        if (sameTitle && sameCatalog) {
+            // Normal field changes may queue offline; claim-changing edits require transactions.
+            gameDoc.set(draft.fields(game.id, newKey)).await()
             return
         }
-        val newClaim = titles(userId).document(updatedKey)
+        val oldTitle = titles(userId).document(game.titleKey)
+        val newTitle = titles(userId).document(newKey)
+        val oldCatalog = game.draft.rawgId?.let { catalogClaim(userId, it) }
+        val newCatalog = draft.rawgId?.let { catalogClaim(userId, it) }
         db.runTransaction { tx ->
-            check(tx.get(gameDoc).exists()) { "Game was removed from another device" }
-            check(tx.get(oldClaim).getString("gameId") == game.id) { "Game title index changed" }
-            if (tx.get(newClaim).exists()) throw DuplicateGameException()
-            tx.set(newClaim, mapOf("gameId" to game.id, "normalizedTitle" to normalizeTitle(draft.title)))
-            tx.set(gameDoc, draft.fields(game.id, updatedKey))
-            tx.delete(oldClaim)
+            val actual = tx.get(gameDoc)
+            check(actual.exists()) { "Game was removed from another device" }
+            check(actual.getString("titleKey") == game.titleKey && actual.getLong("rawgId")?.toInt() == game.draft.rawgId) {
+                "Game was updated on another device; refresh and retry"
+            }
+            if (!sameTitle) {
+                check(tx.get(oldTitle).getString("gameId") == game.id) { "Title index changed" }
+                if (tx.get(newTitle).exists()) throw DuplicateGameException()
+            }
+            if (!sameCatalog) {
+                if (oldCatalog != null) check(tx.get(oldCatalog).getString("gameId") == game.id) { "Catalog index changed" }
+                if (newCatalog != null && tx.get(newCatalog).exists()) throw DuplicateGameException()
+            }
+            if (!sameTitle) {
+                tx.set(newTitle, mapOf("gameId" to game.id, "normalizedTitle" to normalizeTitle(draft.title)))
+                tx.delete(oldTitle)
+            }
+            if (!sameCatalog) {
+                if (newCatalog != null) tx.set(newCatalog, mapOf("gameId" to game.id, "rawgId" to draft.rawgId))
+                if (oldCatalog != null) tx.delete(oldCatalog)
+            }
+            tx.set(gameDoc, draft.fields(game.id, newKey))
         }.await()
     }
 
     override suspend fun delete(userId: String, game: Game) {
         val gameDoc = games(userId).document(game.id)
         val claim = titles(userId).document(game.titleKey)
+        val catalog = game.draft.rawgId?.let { catalogClaim(userId, it) }
         db.runTransaction { tx ->
-            val existingGame = tx.get(gameDoc)
-            val existingClaim = tx.get(claim)
-            if (!existingGame.exists()) return@runTransaction
-            check(existingClaim.getString("gameId") == game.id) { "Title index conflict" }
+            val actual = tx.get(gameDoc)
+            if (!actual.exists()) return@runTransaction
+            check(actual.getString("titleKey") == game.titleKey && actual.getLong("rawgId")?.toInt() == game.draft.rawgId) {
+                "Game was updated on another device; refresh and retry"
+            }
+            check(tx.get(claim).getString("gameId") == game.id) { "Title index conflict" }
+            if (catalog != null) check(tx.get(catalog).getString("gameId") == game.id) { "Catalog index conflict" }
             tx.delete(gameDoc)
             tx.delete(claim)
+            if (catalog != null) tx.delete(catalog)
         }.await()
     }
 
@@ -95,6 +127,11 @@ private fun GameDraft.fields(id: String, key: String): Map<String, Any?> = mapOf
     "releaseDate" to releaseDate.trim(), "notes" to notes, "rating" to rating,
     "completionDate" to completionDate.trim(), "coverUrl" to coverUrl.trim(),
     "heroUrl" to heroUrl.trim(), "queueRank" to queueRank,
+    "rawgId" to rawgId, "rawgSlug" to rawgSlug,
+    "developer" to developer, "publisher" to publisher,
+    "description" to description, "genres" to genres, "tags" to tags,
+    "supportedPlatforms" to supportedPlatforms, "rawgRating" to rawgRating,
+    "steamGridId" to steamGridId,
     "updatedAtMillis" to System.currentTimeMillis()
 )
 
@@ -122,7 +159,17 @@ private fun DocumentSnapshot.toGame(): Game? {
             completionDate = getString("completionDate") ?: "",
             coverUrl = getString("coverUrl") ?: "",
             heroUrl = getString("heroUrl") ?: "",
-            queueRank = getLong("queueRank")
+            queueRank = getLong("queueRank"),
+            rawgId = getLong("rawgId")?.toInt(),
+            rawgSlug = getString("rawgSlug") ?: "",
+            developer = getString("developer") ?: "",
+            publisher = getString("publisher") ?: "",
+            description = getString("description") ?: "",
+            genres = getString("genres") ?: "",
+            tags = getString("tags") ?: "",
+            supportedPlatforms = getString("supportedPlatforms") ?: "",
+            rawgRating = getDouble("rawgRating") ?: getLong("rawgRating")?.toDouble(),
+            steamGridId = getLong("steamGridId")?.toInt()
         )
     )
 }

@@ -12,6 +12,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import com.gamevault.app.data.catalog.CatalogKeys
+import com.gamevault.app.domain.catalog.ArtworkChoices
+import com.gamevault.app.domain.catalog.GameCatalogRepository
+import com.gamevault.app.domain.catalog.CatalogMetadata
+import com.gamevault.app.domain.catalog.applyCatalog
+import com.gamevault.app.ui.catalog.GameCatalogSearch
+import com.gamevault.app.ui.catalog.ArtworkOptionRow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,11 +45,13 @@ import com.gamevault.app.domain.model.GamePlatform
 import com.gamevault.app.ui.theme.VaultMuted
 import com.gamevault.app.ui.theme.VaultPalettes
 
-/** Manual entry is deliberate; RAWG search and metadata will be added in phase 4. */
+/** RAWG-first editor; manual entry and personal lifecycle control remain always available. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameEditorSheet(
     game: Game?,
+    keys: CatalogKeys,
+    catalog: GameCatalogRepository,
     defaultPlatform: GamePlatform,
     saving: Boolean,
     error: String?,
@@ -50,6 +61,34 @@ fun GameEditorSheet(
     var draft by remember(game?.id) { mutableStateOf(game?.draft ?: GameDraft(platform = defaultPlatform)) }
     val accent = VaultPalettes.forPlatform(draft.platform).accent
     val validation = draft.validationError()
+    var choices by remember(game?.id) { mutableStateOf(ArtworkChoices()) }
+    var showAdvanced by remember(game?.id) { mutableStateOf(false) }
+    var showCatalogFields by remember(game?.id) { mutableStateOf(false) }
+    var fallbackCover by remember(game?.id) { mutableStateOf("") }
+    var fallbackHero by remember(game?.id) { mutableStateOf("") }
+    var userCoverChanged by remember(game?.id) { mutableStateOf(false) }
+    var userHeroChanged by remember(game?.id) { mutableStateOf(false) }
+
+    fun applyMetadata(metadata: CatalogMetadata) {
+        // NEVER infer/change interest, acquisition, gameplay, notes, personal rating, or queue.
+        // Existing artwork survives a refresh of the same game; a new game uses RAWG fallback.
+        userCoverChanged = false
+        userHeroChanged = false
+        fallbackCover = metadata.fallbackImage
+        fallbackHero = metadata.fallbackHero
+        draft = draft.applyCatalog(metadata)
+    }
+    fun applyArtwork(artwork: ArtworkChoices) {
+        choices = artwork
+        if (!artwork.exactMatch) return
+        draft = draft.copy(
+            steamGridId = artwork.steamGridId,
+            coverUrl = if (!userCoverChanged && (draft.coverUrl.isBlank() || draft.coverUrl == fallbackCover))
+                artwork.covers.firstOrNull()?.url ?: draft.coverUrl else draft.coverUrl,
+            heroUrl = if (!userHeroChanged && (draft.heroUrl.isBlank() || draft.heroUrl == fallbackHero))
+                artwork.heroes.firstOrNull()?.url ?: draft.heroUrl else draft.heroUrl
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -73,8 +112,14 @@ fun GameEditorSheet(
                 }
             }
             item {
+                GameCatalogSearch(
+                    keys = keys, catalog = catalog, currentRawgId = draft.rawgId,
+                    onMetadata = ::applyMetadata, onArtwork = ::applyArtwork
+                )
+            }
+            item {
                 OutlinedTextField(
-                    value = draft.title, onValueChange = { draft = draft.copy(title = it) },
+                    value = draft.title, onValueChange = { draft = draft.copy(title = it, rawgId = null, rawgSlug = "", steamGridId = null) },
                     label = { Text("Game title *") }, modifier = Modifier.fillMaxWidth(),
                     singleLine = true, shape = RoundedCornerShape(15.dp)
                 )
@@ -96,6 +141,12 @@ fun GameEditorSheet(
                 }
             }
             item { HorizontalDivider(color = Color.White.copy(alpha = 0.10f)) }
+            item {
+                OutlinedButton(onClick = { showAdvanced = !showAdvanced }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (showAdvanced) "Hide personal statuses and details ▲" else "Personal statuses and details ▼")
+                }
+            }
+            if (showAdvanced) {
             item { Text("LIFECYCLE", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             item { EnumPicker("Release", draft.release, ReleaseStatus.entries, { it.label }) { draft = draft.copy(release = it) } }
             item { EnumPicker("Interest", draft.interest, InterestStatus.entries, { it.label }) { draft = draft.copy(interest = it) } }
@@ -109,13 +160,43 @@ fun GameEditorSheet(
             item { HorizontalDivider(color = Color.White.copy(alpha = 0.10f)) }
             item { Text("PERSONAL DETAILS", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             item { EnumPicker("My rating", draft.rating, listOf<Int?>(null) + (1..10).map { it }, { it?.let { "$it / 10" } ?: "Unrated" }) { draft = draft.copy(rating = it) } }
-            item { EditorText("Release date (YYYY-MM-DD)", draft.releaseDate) { draft = draft.copy(releaseDate = it) } }
             item { EditorText("Completion date (YYYY-MM-DD)", draft.completionDate) { draft = draft.copy(completionDate = it) } }
             item { OutlinedTextField(draft.notes, { draft = draft.copy(notes = it) }, label = { Text("Personal notes") }, minLines = 3, maxLines = 7, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) }
+            } // personal statuses/details
+            item {
+                OutlinedButton(onClick = { showCatalogFields = !showCatalogFields }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (showCatalogFields) "Hide metadata fields ▲" else "Metadata / manual overrides ▼")
+                }
+            }
+            if (showCatalogFields) {
+                item { Text("GAME METADATA", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                item { EditorText("Developer", draft.developer) { draft = draft.copy(developer = it) } }
+                item { EditorText("Publisher", draft.publisher) { draft = draft.copy(publisher = it) } }
+                item { EditorText("Genres (comma-separated)", draft.genres) { draft = draft.copy(genres = it) } }
+                item { EditorText("Tags", draft.tags) { draft = draft.copy(tags = it) } }
+                item { EditorText("Supported platforms", draft.supportedPlatforms) { draft = draft.copy(supportedPlatforms = it) } }
+                item { EditorText("Release date (YYYY-MM-DD)", draft.releaseDate) { draft = draft.copy(releaseDate = it) } }
+                item { OutlinedTextField(draft.description, { draft = draft.copy(description = it) }, label = { Text("Game description") }, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 8) }
+            }
             item { Text("ARTWORK (OPTIONAL)", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-            item { Text("Portrait cover and landscape hero links. Image search/selection comes in Phase 4.", color = VaultMuted, fontSize = 12.sp) }
-            item { EditorText("HTTPS cover image URL", draft.coverUrl) { draft = draft.copy(coverUrl = it) } }
-            item { EditorText("HTTPS hero image URL", draft.heroUrl) { draft = draft.copy(heroUrl = it) } }
+            item { Text("Portrait cover and landscape hero links. Select a SteamGridDB cover and hero below, or enter your own HTTPS URL.", color = VaultMuted, fontSize = 12.sp) }
+            item {
+                ArtworkOptionRow("Portrait covers", choices.covers, draft.coverUrl,
+                    { userCoverChanged = true; draft = draft.copy(coverUrl = it) }, portrait = true)
+            }
+            item {
+                ArtworkOptionRow("Landscape heroes", choices.heroes, draft.heroUrl,
+                    { userHeroChanged = true; draft = draft.copy(heroUrl = it) }, portrait = false)
+            }
+            if (choices.matchedName.isNotBlank() && !choices.exactMatch) {
+                item { Text("Artwork match was not exact; select manual URLs to avoid incorrect game art.", color = Color(0xFFFFCC90), fontSize = 12.sp) }
+            }
+            if (keys.steamGridDb.isBlank()) {
+                item { Text("SteamGridDB key not configured. Add it in Settings for cover and hero choices.", color = VaultMuted, fontSize = 12.sp) }
+            }
+            item { EditorText("HTTPS cover image URL", draft.coverUrl) { userCoverChanged = true; draft = draft.copy(coverUrl = it) } }
+            item { EditorText("HTTPS hero image URL", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
+            item { Text("Game metadata: RAWG · Artwork: SteamGridDB. Provider credits and external links are available in game details.", color = VaultMuted, fontSize = 11.sp) }
             if (error != null) item { Text(error, color = Color(0xFFFFA6A6), fontSize = 13.sp) }
             item {
                 Button(

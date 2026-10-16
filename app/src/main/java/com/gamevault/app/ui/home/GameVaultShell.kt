@@ -12,6 +12,10 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.gamevault.app.data.catalog.CatalogKeys
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -56,6 +59,9 @@ fun GameVaultShell(
     val container = (LocalContext.current.applicationContext as GameVaultApplication).container
     val gamesViewModel: GameLibraryViewModel = viewModel(factory = GameLibraryViewModel.Factory(container.gameRepository))
     val state by gamesViewModel.state.collectAsStateWithLifecycle()
+    val apiKeys by container.apiKeySettings.keys.collectAsStateWithLifecycle(initialValue = CatalogKeys())
+    val keysScope = rememberCoroutineScope()
+    var apiSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(user.uid) { gamesViewModel.observe(user.uid) }
 
     val navController = rememberNavController()
@@ -112,7 +118,15 @@ fun GameVaultShell(
                 }
                 composable(VaultDestination.QUEUE.route) { QueueScreen(state.games) }
                 composable(VaultDestination.SETTINGS.route) {
-                    SettingsScreen(user, busy, message, error, onVerifyCloud, onSignOut)
+                    SettingsScreen(user, busy, message, error, onVerifyCloud, onSignOut,
+                        apiKeys = apiKeys, apiSettingsError = apiSettingsError,
+                        onSaveApiKeys = { rawg, steam ->
+                            apiSettingsError = null
+                            keysScope.launch {
+                                try { container.apiKeySettings.save(rawg, steam) }
+                                catch (failure: Exception) { apiSettingsError = failure.message ?: "Unable to save API settings" }
+                            }
+                        })
                 }
             }
         }
@@ -135,6 +149,8 @@ fun GameVaultShell(
     if (showEditor) {
         GameEditorSheet(
             game = editingGame,
+            keys = apiKeys,
+            catalog = container.catalogRepository,
             defaultPlatform = platform,
             saving = state.saving,
             error = state.error,
