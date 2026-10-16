@@ -1,20 +1,23 @@
 package com.gamevault.app.ui.game
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.LaunchedEffect
 import com.gamevault.app.data.catalog.CatalogKeys
 import com.gamevault.app.domain.catalog.ArtworkChoices
 import com.gamevault.app.domain.catalog.GameCatalogRepository
@@ -24,14 +27,15 @@ import com.gamevault.app.ui.catalog.GameCatalogSearch
 import com.gamevault.app.ui.catalog.ArtworkOptionRow
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +51,6 @@ import com.gamevault.app.ui.theme.VaultMuted
 import com.gamevault.app.ui.theme.VaultPalettes
 
 /** RAWG-first editor; manual entry and personal lifecycle control remain always available. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameEditorSheet(
     game: Game?,
@@ -91,27 +94,55 @@ fun GameEditorSheet(
         )
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        sheetGesturesEnabled = true,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = Color(0xFF121725),
-        contentColor = Color.White
+    // A fixed dialog sheet avoids ModalBottomSheet's competing nested-scroll and
+    // swipe-to-dismiss physics. Only the LazyColumn scrolls; Back, scrim tap and
+    // the visible Close button dismiss it. This intentionally does not drag.
+    Dialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        properties = DialogProperties(
+            dismissOnBackPress = !saving,
+            dismissOnClickOutside = !saving,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.87f),
-            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 35.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        Box(
+            modifier = Modifier.fillMaxSize().imePadding()
+                .clickable(enabled = !saving) { onDismiss() },
+            contentAlignment = Alignment.BottomCenter
         ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(if (game == null) "ADD A GAME" else "EDIT GAME", color = accent,
-                        fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Text(if (game == null) "Add a game" else "Edit game",
-                        fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                }
-            }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.92f)
+                    .clickable { /* Consume taps inside the sheet, not the backdrop. */ },
+                shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+                color = Color(0xFF121725),
+                contentColor = Color.White,
+                tonalElevation = 10.dp
+            ) {
+                Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(start = 22.dp, end = 14.dp, top = 13.dp, bottom = 7.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (game == null) "Add a game" else "Edit game",
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        TextButton(onClick = onDismiss, enabled = !saving) {
+                            Text("Close", color = accent)
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 35.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
             item {
                 GameCatalogSearch(
                     keys = keys, catalog = catalog, currentRawgId = draft.rawgId,
@@ -201,21 +232,21 @@ fun GameEditorSheet(
             }
             item { Text("ARTWORK", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             item {
-                ArtworkOptionRow("Portrait covers", choices.covers, draft.coverUrl,
+                ArtworkOptionRow("Album Art", choices.covers, draft.coverUrl,
                     { userCoverChanged = true; draft = draft.copy(coverUrl = it) }, portrait = true)
             }
             item {
-                ArtworkOptionRow("Background artwork", choices.heroes, draft.heroUrl,
+                ArtworkOptionRow("Cover Image", choices.heroes, draft.heroUrl,
                     { userHeroChanged = true; draft = draft.copy(heroUrl = it) }, portrait = false)
             }
             if (choices.matchedName.isNotBlank() && !choices.exactMatch) {
                 item { Text("Artwork match was not exact; select manual URLs to avoid incorrect game art.", color = Color(0xFFFFCC90), fontSize = 12.sp) }
             }
             if (keys.steamGridDb.isBlank()) {
-                item { Text("SteamGridDB key not configured. Add it in Settings for cover and hero choices.", color = VaultMuted, fontSize = 12.sp) }
+                item { Text("Add a SteamGridDB key in Settings for artwork choices.", color = VaultMuted, fontSize = 12.sp) }
             }
-            item { EditorText("HTTPS cover image URL", draft.coverUrl) { userCoverChanged = true; draft = draft.copy(coverUrl = it) } }
-            item { EditorText("HTTPS background image URL", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
+            item { EditorText("Album Art", draft.coverUrl) { userCoverChanged = true; draft = draft.copy(coverUrl = it) } }
+            item { EditorText("Cover Image", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
 
             if (error != null) item { Text(error, color = Color(0xFFFFA6A6), fontSize = 13.sp) }
             item {
@@ -230,6 +261,9 @@ fun GameEditorSheet(
                     else Text(if (game == null) "Add to library" else "Save changes", fontWeight = FontWeight.Bold)
                 }
                 if (validation != null && draft.title.isNotBlank()) Text(validation, color = VaultMuted, fontSize = 11.sp)
+            }
+                    }
+                }
             }
         }
     }

@@ -8,6 +8,8 @@ interface GameRepository {
     suspend fun create(userId: String, draft: GameDraft)
     suspend fun update(userId: String, game: Game, draft: GameDraft)
     suspend fun delete(userId: String, game: Game)
+    /** Queue membership is explicit; lifecycle statuses never imply membership. */
+    suspend fun setQueued(userId: String, gameId: String, queued: Boolean)
 }
 
 class DuplicateGameException : IllegalArgumentException("This title is already in your collection")

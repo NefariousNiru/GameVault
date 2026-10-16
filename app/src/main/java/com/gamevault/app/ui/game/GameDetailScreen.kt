@@ -50,14 +50,16 @@ import com.gamevault.app.ui.theme.ArtworkMood
 import com.gamevault.app.ui.theme.VaultMuted
 import com.gamevault.app.ui.theme.VaultPalettes
 
-/** Full-screen game experience: cover photo + album art with a gradient sampled from the portrait cover. */
+/** Full-screen game experience: cover photo + album art with a gradient sampled from the portrait album art. */
 @Composable
 fun GameDetailScreen(
     game: Game,
     busy: Boolean,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onToggleQueue: () -> Unit,
+    queueError: String? = null
 ) {
     BackHandler(onBack = onDismiss)
     val draft = game.draft
@@ -193,7 +195,24 @@ fun GameDetailScreen(
                         )
                         if (draft.completionDate.isNotBlank()) InfoRow("Completed", draft.completionDate)
                         if (draft.notes.isNotBlank()) InfoRow("Notes", draft.notes)
+                        InfoRow("Play Queue", if (draft.queueRank == null) "Not queued" else "Queued")
                     }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = onToggleQueue,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().height(49.dp),
+                        shape = RoundedCornerShape(15.dp),
+                        border = BorderStroke(1.dp, mood.accent.copy(alpha = 0.55f))
+                    ) {
+                        Text(
+                            if (draft.queueRank == null) "+ Add to Queue" else "Remove from Queue",
+                            color = mood.accent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    queueError?.let { Text(it, color = Color(0xFFFFAAAA), fontSize = 12.sp) }
                 }
                 item {
                     Button(

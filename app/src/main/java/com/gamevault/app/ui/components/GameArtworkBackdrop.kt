@@ -22,7 +22,7 @@ import com.gamevault.app.ui.theme.ArtworkPalette
 import com.gamevault.app.ui.theme.SectionPalette
 import kotlinx.coroutines.launch
 
-/** Sample colors from the portrait cover to create a gradient-rich detail backdrop. */
+/** Sample colors from the portrait album art to create a gradient-rich detail backdrop. */
 @Composable
 fun GameArtworkBackdrop(
     artworkUrl: String,

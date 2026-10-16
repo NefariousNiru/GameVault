@@ -105,7 +105,11 @@ fun GameVaultShell(
                 gamesViewModel.clearError()
                 showEditor = true
             },
-            onDelete = { gamesViewModel.delete(detailsGame) { detailId = null } }
+            onDelete = { gamesViewModel.delete(detailsGame) { detailId = null } },
+            onToggleQueue = {
+                gamesViewModel.setQueued(detailsGame, detailsGame.draft.queueRank == null)
+            },
+            queueError = state.error
         )
     } else {
         VaultBackdrop(palette) {
@@ -143,7 +147,15 @@ fun GameVaultShell(
                             }
                         )
                     }
-                    composable(VaultDestination.QUEUE.route) { QueueScreen(state.games) }
+                    composable(VaultDestination.QUEUE.route) {
+                        QueueScreen(
+                            games = state.games,
+                            busy = state.saving,
+                            error = state.error,
+                            onOpen = { game -> gamesViewModel.clearError(); detailId = game.id },
+                            onRemove = { game -> gamesViewModel.setQueued(game, false) }
+                        )
+                    }
                     composable(VaultDestination.SETTINGS.route) {
                         SettingsScreen(
                             user = user,

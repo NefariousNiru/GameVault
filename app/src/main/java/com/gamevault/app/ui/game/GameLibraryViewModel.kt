@@ -62,6 +62,22 @@ class GameLibraryViewModel(private val repository: GameRepository) : ViewModel()
         }
     }
 
+    /** Add/remove explicitly, without coupling queue membership to Play Status. */
+    fun setQueued(game: Game, queued: Boolean) {
+        val uid = observedUid ?: return
+        if (mutable.value.saving) return
+        mutable.update { it.copy(saving = true, error = null) }
+        viewModelScope.launch {
+            try {
+                repository.setQueued(uid, game.id, queued)
+            } catch (error: Exception) {
+                mutable.update { it.copy(error = error.message ?: "Could not update queue") }
+            } finally {
+                mutable.update { it.copy(saving = false) }
+            }
+        }
+    }
+
     fun delete(game: Game, onSuccess: () -> Unit) {
         val uid = observedUid ?: return
         if (mutable.value.saving) return

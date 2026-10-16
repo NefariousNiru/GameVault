@@ -98,9 +98,9 @@ fun LibraryScreen(
         item(span = { GridItemSpan(maxLineSpan) }) { VaultBrand(iconColor = palette.accent) }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                "The Collection",
-                fontSize = 25.sp,
-                lineHeight = 30.sp,
+                "THE COLLECTION",
+                fontSize = 19.sp,
+                lineHeight = 24.sp,
                 color = palette.accent,
                 fontWeight = FontWeight.ExtraBold
             )
@@ -304,7 +304,7 @@ private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, 
                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(palette.glow.copy(alpha = .55f), Color(0xFF121726)))))
                 if (draft.coverUrl.isNotBlank()) AsyncImage(
                     model = draft.coverUrl,
-                    contentDescription = "${draft.title} cover",
+                    contentDescription = "${draft.title} album art",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 ) else Icon(painterResource(R.drawable.gv_ic_library), null, Modifier.align(Alignment.Center).size(46.dp), tint = palette.accent)

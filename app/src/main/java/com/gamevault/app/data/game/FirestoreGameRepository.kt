@@ -143,6 +143,31 @@ class FirestoreGameRepository(private val db: FirebaseFirestore) : GameRepositor
         }.await()
     }
 
+    /**
+     * Reserve a monotonically increasing queue rank using a per-user counter.
+     * The transaction serializes additions across devices, so ranks do not collide.
+     * Removing a game leaves a gap; the UI displays contiguous list positions.
+     */
+    override suspend fun setQueued(userId: String, gameId: String, queued: Boolean) {
+        val counter = db.collection("users").document(userId)
+            .collection("queueState").document("main")
+        val gameDoc = games(userId).document(gameId)
+        db.runTransaction { tx ->
+            val counterSnapshot = tx.get(counter)
+            val gameSnapshot = tx.get(gameDoc)
+            require(gameSnapshot.exists()) { "Game no longer exists" }
+            val existingRank = gameSnapshot.getLong("queueRank")
+            if (queued && existingRank == null) {
+                val next = (counterSnapshot.getLong("nextRank") ?: 0L)
+                require(next < Long.MAX_VALUE) { "Queue capacity exceeded" }
+                tx.set(counter, mapOf("nextRank" to next + 1L))
+                tx.update(gameDoc, mapOf("queueRank" to next, "updatedAtMillis" to System.currentTimeMillis()))
+            } else if (!queued && existingRank != null) {
+                tx.update(gameDoc, mapOf("queueRank" to null, "updatedAtMillis" to System.currentTimeMillis()))
+            }
+        }.await()
+    }
+
     private fun requireValid(draft: GameDraft) {
         draft.validationError()?.let { throw IllegalArgumentException(it) }
     }
