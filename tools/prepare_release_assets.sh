@@ -57,7 +57,7 @@ sha256sum -c SHA256SUMS.txt
 
 Run the verification command in the directory containing both the APK and checksum file.
 
-**Note:** The APK is signed with the permanent release certificate. It cannot be installed over a debug-signed copy. Back up/sync your library before uninstalling an existing debug build.
+**Note:** The APK is signed with the permanent release certificate indicating it came from this repository
 
 For screenshots, features and setup instructions, see the [GameVault README](https://github.com/${repository}#readme).
 NOTES
