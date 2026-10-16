@@ -65,6 +65,15 @@ From the GitHub repository's **Actions** tab:
 
 Workflow needs Actions enabled, repository write access, and permission to create GitHub releases. If repository policy prevents `GITHUB_TOKEN` from creating releases, download the signed APK artifact and publish it manually as a release asset.
 
+### If Android SDK setup fails on GitHub Actions
+
+The release workflow uses `android-actions/setup-android@v4` with `packages: 'platform-tools'`.
+Older `setup-android@v3` workflows may fail with `Warning: Failed to find package 'tools'` because
+Google retired that SDK package. The current action installs command-line tools and licenses without
+requesting `tools`. To apply the fix to your existing repository, replace
+`.github/workflows/android-release.yml` with the version in this source package, commit, and push it,
+then rerun the workflow **without publishing** first. This is an SDK setup failure, not a Kotlin compile error.
+
 ### Build locally, instead
 
 Once your working project has Android SDK, Gradle (or a real Gradle wrapper JAR), a permanent keystore, and `app/google-services.json`:

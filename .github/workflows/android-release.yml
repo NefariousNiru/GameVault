@@ -38,7 +38,12 @@ jobs:
           java-version: '25'
 
       - name: Install Android SDK tools
-        uses: android-actions/setup-android@v3
+        # setup-android@v3 tried installing the discontinued SDK "tools" package.
+        # v4 defaults to modern platform-tools; keep it explicit for clarity.
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: 'false'
 
       # The shared source ZIP intentionally does not include a Gradle wrapper JAR.
       # setup-gradle supplies the pinned Gradle version directly.
