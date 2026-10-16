@@ -18,6 +18,7 @@ import com.gamevault.app.data.catalog.CatalogKeys
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -62,6 +63,8 @@ fun GameVaultShell(
     val apiKeys by container.apiKeySettings.keys.collectAsStateWithLifecycle(initialValue = CatalogKeys())
     val keysScope = rememberCoroutineScope()
     var apiSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
+    var apiSettingsSaving by rememberSaveable { mutableStateOf(false) }
+    var apiSavedCount by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(user.uid) { gamesViewModel.observe(user.uid) }
 
     val navController = rememberNavController()
@@ -120,11 +123,19 @@ fun GameVaultShell(
                 composable(VaultDestination.SETTINGS.route) {
                     SettingsScreen(user, busy, message, error, onVerifyCloud, onSignOut,
                         apiKeys = apiKeys, apiSettingsError = apiSettingsError,
+                        apiSettingsSaving = apiSettingsSaving, apiSavedCount = apiSavedCount,
                         onSaveApiKeys = { rawg, steam ->
                             apiSettingsError = null
-                            keysScope.launch {
-                                try { container.apiKeySettings.save(rawg, steam) }
-                                catch (failure: Exception) { apiSettingsError = failure.message ?: "Unable to save API settings" }
+                            if (!apiSettingsSaving) keysScope.launch {
+                                apiSettingsSaving = true
+                                try {
+                                    container.apiKeySettings.save(rawg, steam)
+                                    apiSavedCount++
+                                } catch (failure: Exception) {
+                                    apiSettingsError = failure.message ?: "Unable to save API settings"
+                                } finally {
+                                    apiSettingsSaving = false
+                                }
                             }
                         })
                 }
@@ -171,7 +182,7 @@ private fun VaultBottomNavigation(
     selected: VaultDestination,
     onSelect: (VaultDestination) -> Unit
 ) {
-    NavigationBar(modifier = Modifier.fillMaxWidth(), containerColor = Color(0xFF0B0E17),
+    NavigationBar(modifier = Modifier.fillMaxWidth(), containerColor = palette.background,
         contentColor = Color.White, tonalElevation = 0.dp) {
         VaultDestination.entries.forEach { destination ->
             val active = destination == selected

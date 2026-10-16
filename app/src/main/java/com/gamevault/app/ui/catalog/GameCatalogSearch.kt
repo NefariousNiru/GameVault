@@ -39,6 +39,7 @@ fun GameCatalogSearch(
     var matches by remember { mutableStateOf(emptyList<CatalogMatch>()) }
     var selected by remember { mutableStateOf<CatalogMatch?>(null) }
     var loadingSearch by remember { mutableStateOf(false) }
+    var searchCompleted by remember { mutableStateOf(false) }
     var loadingDetails by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
     var selectedError by remember { mutableStateOf<String?>(null) }
@@ -48,11 +49,13 @@ fun GameCatalogSearch(
         matches = emptyList()
         searchError = null
         loadingSearch = false
+        searchCompleted = false
         if (query.trim().length < 2 || keys.rawg.isBlank() || selected != null) return@LaunchedEffect
         delay(400)
         loadingSearch = true
         try {
             matches = catalog.search(query, keys.rawg)
+            searchCompleted = true
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -75,7 +78,7 @@ fun GameCatalogSearch(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    selectedError = "Metadata loaded; artwork unavailable: ${readableCatalogError(error)}"
+                    selectedError = "Game details loaded, but artwork is unavailable: ${readableCatalogError(error)}"
                 }
             }
         } catch (cancel: CancellationException) {
@@ -88,8 +91,10 @@ fun GameCatalogSearch(
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        Text("FIND YOUR GAME", fontWeight = FontWeight.ExtraBold, color = Color(0xFF8CD7FF), fontSize = 11.sp)
-        Text("Search once, then adjust only what you want.", color = Color(0xFFABB9D2), fontSize = 12.sp)
+        Text("1  ·  FIND A GAME", fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFFDCE9F8), fontSize = 11.sp, letterSpacing = 1.3.sp)
+        Text("Search for a game and tap the correct result. We'll fill the details for you.",
+            color = Color(0xFFABB9D2), fontSize = 12.sp, lineHeight = 18.sp)
         if (keys.rawg.isBlank()) {
             Text("Add a free RAWG API key in Settings to enable search. Manual entry still works.",
                 color = Color(0xFFFFCB8C), fontSize = 13.sp)
@@ -101,7 +106,7 @@ fun GameCatalogSearch(
                     selected = null
                     selectedError = null
                 },
-                label = { Text("Search RAWG titles") },
+                label = { Text("Search games · RAWG") },
                 placeholder = { Text("e.g. Elden Ring, Control, Pragmata") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -130,7 +135,7 @@ fun GameCatalogSearch(
                         }
                     }
                 }
-            } else if (!loadingSearch && query.trim().length >= 2 && selected == null && searchError == null) {
+            } else if (searchCompleted && !loadingSearch && query.trim().length >= 2 && selected == null && searchError == null) {
                 Text("No matches. You can enter the game manually below.", color = Color(0xFFABB9D2), fontSize = 12.sp)
             }
             searchError?.let { Text(it, color = Color(0xFFFFA9AC), fontSize = 12.sp) }
@@ -138,9 +143,12 @@ fun GameCatalogSearch(
                 Text(it, color = Color(0xFFFFC58A), fontSize = 12.sp)
                 if (selected != null) TextButton(onClick = { retrySerial++ }) { Text("Retry details") }
             }
-            if (currentRawgId != null) {
-                Text("Linked to RAWG game #$currentRawgId · Edit search to choose a different title",
-                    color = Color(0xFF99DCFF), fontSize = 11.sp)
+            if (selected != null) {
+                Text("✓ ${selected?.title} selected · Game details will fill automatically",
+                    color = Color(0xFF98E6B6), fontSize = 12.sp)
+            } else if (currentRawgId != null) {
+                Text("✓ Game details linked to RAWG. Search to choose another game.",
+                    color = Color(0xFF98E6B6), fontSize = 12.sp)
             }
         }
     }

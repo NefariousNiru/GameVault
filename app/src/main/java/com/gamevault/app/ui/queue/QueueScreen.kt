@@ -42,7 +42,7 @@ fun QueueScreen(games: List<Game>) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("THE NEXT CHAPTER", color = palette.accent, fontSize = 10.sp, letterSpacing = 3.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Your play queue", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 31.sp)
-                Text("One queue. Every platform. Your order.", color = VaultMuted, fontSize = 14.sp)
+
             }
         }
         if (queued.isEmpty()) {

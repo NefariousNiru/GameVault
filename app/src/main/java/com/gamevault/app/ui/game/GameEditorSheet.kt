@@ -107,7 +107,7 @@ fun GameEditorSheet(
                         fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                     Text(if (game == null) "A new adventure" else "Curate this game",
                         fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Changes are private and saved to your GameVault cloud library.",
+                    Text("Find a title to fill its details, or enter one yourself.",
                         color = VaultMuted, fontSize = 12.sp)
                 }
             }
@@ -118,11 +118,23 @@ fun GameEditorSheet(
                 )
             }
             item {
-                OutlinedTextField(
-                    value = draft.title, onValueChange = { draft = draft.copy(title = it, rawgId = null, rawgSlug = "", steamGridId = null) },
-                    label = { Text("Game title *") }, modifier = Modifier.fillMaxWidth(),
-                    singleLine = true, shape = RoundedCornerShape(15.dp)
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("GAME TITLE", color = accent, fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                    Text("Choose a game in the search above to fill this automatically. You can also type a name yourself.",
+                        color = VaultMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                    OutlinedTextField(
+                        value = draft.title,
+                        onValueChange = { draft = draft.copy(title = it) },
+                        label = { Text("Title *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true, shape = RoundedCornerShape(15.dp),
+                        supportingText = {
+                            Text(if (draft.rawgId != null) "Matched with RAWG game details · name can be customized"
+                                else "Manual game · search above for automatic details")
+                        }
+                    )
+                }
             }
             item {
                 Text("PLATFORM", fontSize = 11.sp, color = VaultMuted, fontWeight = FontWeight.Bold)
@@ -143,33 +155,42 @@ fun GameEditorSheet(
             item { HorizontalDivider(color = Color.White.copy(alpha = 0.10f)) }
             item {
                 OutlinedButton(onClick = { showAdvanced = !showAdvanced }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (showAdvanced) "Hide personal statuses and details ▲" else "Personal statuses and details ▼")
+                    Text(if (showAdvanced) "Hide your game progress ▲" else "Your game progress and preferences ▼")
                 }
             }
             if (showAdvanced) {
-            item { Text("LIFECYCLE", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-            item { EnumPicker("Release", draft.release, ReleaseStatus.entries, { it.label }) { draft = draft.copy(release = it) } }
-            item { EnumPicker("Interest", draft.interest, InterestStatus.entries, { it.label }) { draft = draft.copy(interest = it) } }
-            item { EnumPicker("Gameplay", draft.gameplay, GameplayStatus.entries, { it.label }) { draft = draft.copy(gameplay = it) } }
+            item { Text("YOUR GAME STATUS", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            item { EnumPicker("Release status", draft.release, ReleaseStatus.entries, { it.label }) { draft = draft.copy(release = it) } }
+            item { EnumPicker("Want to play?", draft.interest, InterestStatus.entries, { it.label }) { draft = draft.copy(interest = it) } }
+            item { EnumPicker("Play status", draft.gameplay, GameplayStatus.entries, { it.label }) { draft = draft.copy(gameplay = it) } }
             if (draft.platform == GamePlatform.PC) {
-                item { EnumPicker("PC acquisition", draft.pcAcquisition, PcAcquisition.entries, { it.label }) { draft = draft.copy(pcAcquisition = it) } }
+                item { EnumPicker("PC download status", draft.pcAcquisition, PcAcquisition.entries, { it.label }) { draft = draft.copy(pcAcquisition = it) } }
             } else {
-                item { EnumPicker("PS5 acquisition", draft.ps5Acquisition, Ps5Acquisition.entries, { it.label }) { draft = draft.copy(ps5Acquisition = it) } }
-                item { EnumPicker("PS5 library", draft.ps5Library, Ps5Library.entries, { it.label }) { draft = draft.copy(ps5Library = it) } }
+                item {
+                    EnumPicker("How do you access this game?", draft.ps5Acquisition, Ps5Acquisition.entries, { it.label }) {
+                        // Keep the legacy PS5 library field consistent with the chosen
+                        // source; it remains stored for backward compatibility only.
+                        draft = draft.copy(
+                            ps5Acquisition = it,
+                            ps5Library = if (it == Ps5Acquisition.NOT_OWNED || it == Ps5Acquisition.PREORDERED)
+                                Ps5Library.NOT_ADDED else Ps5Library.IN_LIBRARY
+                        )
+                    }
+                }
             }
             item { HorizontalDivider(color = Color.White.copy(alpha = 0.10f)) }
             item { Text("PERSONAL DETAILS", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-            item { EnumPicker("My rating", draft.rating, listOf<Int?>(null) + (1..10).map { it }, { it?.let { "$it / 10" } ?: "Unrated" }) { draft = draft.copy(rating = it) } }
+            item { EnumPicker("Your rating", draft.rating, listOf<Int?>(null) + (1..10).map { it }, { it?.let { "$it / 10" } ?: "Unrated" }) { draft = draft.copy(rating = it) } }
             item { EditorText("Completion date (YYYY-MM-DD)", draft.completionDate) { draft = draft.copy(completionDate = it) } }
             item { OutlinedTextField(draft.notes, { draft = draft.copy(notes = it) }, label = { Text("Personal notes") }, minLines = 3, maxLines = 7, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) }
             } // personal statuses/details
             item {
                 OutlinedButton(onClick = { showCatalogFields = !showCatalogFields }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (showCatalogFields) "Hide metadata fields ▲" else "Metadata / manual overrides ▼")
+                    Text(if (showCatalogFields) "Hide game information ▲" else "Game information · optional edits ▼")
                 }
             }
             if (showCatalogFields) {
-                item { Text("GAME METADATA", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                item { Text("GAME INFORMATION", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 item { EditorText("Developer", draft.developer) { draft = draft.copy(developer = it) } }
                 item { EditorText("Publisher", draft.publisher) { draft = draft.copy(publisher = it) } }
                 item { EditorText("Genres (comma-separated)", draft.genres) { draft = draft.copy(genres = it) } }
@@ -179,13 +200,13 @@ fun GameEditorSheet(
                 item { OutlinedTextField(draft.description, { draft = draft.copy(description = it) }, label = { Text("Game description") }, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 8) }
             }
             item { Text("ARTWORK (OPTIONAL)", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-            item { Text("Portrait cover and landscape hero links. Select a SteamGridDB cover and hero below, or enter your own HTTPS URL.", color = VaultMuted, fontSize = 12.sp) }
+            item { Text("Cover art appears in your library. Background art colors the entire game details screen. Pick an image below or paste an HTTPS link.", color = VaultMuted, fontSize = 12.sp) }
             item {
                 ArtworkOptionRow("Portrait covers", choices.covers, draft.coverUrl,
                     { userCoverChanged = true; draft = draft.copy(coverUrl = it) }, portrait = true)
             }
             item {
-                ArtworkOptionRow("Landscape heroes", choices.heroes, draft.heroUrl,
+                ArtworkOptionRow("Background artwork", choices.heroes, draft.heroUrl,
                     { userHeroChanged = true; draft = draft.copy(heroUrl = it) }, portrait = false)
             }
             if (choices.matchedName.isNotBlank() && !choices.exactMatch) {
@@ -195,8 +216,8 @@ fun GameEditorSheet(
                 item { Text("SteamGridDB key not configured. Add it in Settings for cover and hero choices.", color = VaultMuted, fontSize = 12.sp) }
             }
             item { EditorText("HTTPS cover image URL", draft.coverUrl) { userCoverChanged = true; draft = draft.copy(coverUrl = it) } }
-            item { EditorText("HTTPS hero image URL", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
-            item { Text("Game metadata: RAWG · Artwork: SteamGridDB. Provider credits and external links are available in game details.", color = VaultMuted, fontSize = 11.sp) }
+            item { EditorText("HTTPS background image URL", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
+            item { Text("Game details supplied by RAWG · Artwork from SteamGridDB. Source links appear on the game page.", color = VaultMuted, fontSize = 11.sp) }
             if (error != null) item { Text(error, color = Color(0xFFFFA6A6), fontSize = 13.sp) }
             item {
                 Button(

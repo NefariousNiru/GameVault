@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,9 +97,8 @@ fun LibraryScreen(
         item(span = { GridItemSpan(maxLineSpan) }) { VaultBrand(iconColor = palette.accent) }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("THE COLLECTION", color = palette.accent, letterSpacing = 3.sp, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Your games. Your universe.", fontSize = 29.sp, lineHeight = 35.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
-                Text("One home for every adventure.", color = VaultMuted, fontSize = 13.sp)
+                Text("The Collection", fontSize = 31.sp, lineHeight = 38.sp,
+                    color = Color.White, fontWeight = FontWeight.ExtraBold)
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) { PlatformSwitcher(platform, onPlatformChanged) }
@@ -107,7 +106,7 @@ fun LibraryScreen(
         item(span = { GridItemSpan(maxLineSpan) }) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("Your collection", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text("Games", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text(if (platform == GamePlatform.PC) "PC titles" else "PlayStation 5 titles", color = VaultMuted, fontSize = 12.sp)
                 }
                 Text("$libraryCount GAMES", color = palette.accent, fontSize = 11.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
@@ -152,7 +151,7 @@ fun LibraryScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 TextButton(onClick = {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rawg.io/")))
-                }) { Text("Game metadata supplied by RAWG ↗", fontSize = 12.sp) }
+                }) { Text("Game details supplied by RAWG ↗", fontSize = 12.sp) }
             }
         }
         if (state.loading) {
@@ -237,16 +236,41 @@ private fun PlatformSwitcher(selected: GamePlatform, onSelect: (GamePlatform) ->
     }
 }
 
+/** Cinematic platform banner rendered in Compose; no network images required. */
 @Composable
 private fun LibraryHero(platform: GamePlatform, palette: SectionPalette) {
-    Box(Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(25.dp))
-        .border(BorderStroke(1.dp, palette.accent.copy(alpha = .18f)), RoundedCornerShape(25.dp))) {
-        Image(painterResource(if (platform == GamePlatform.PC) R.drawable.gv_hero_pc else R.drawable.gv_hero_ps5), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xE0080D19), Color(0x9B080D19), Color.Transparent))))
-        Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(palette.label, color = palette.accent, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-            Text(if (platform == GamePlatform.PC) "Every world,\none place." else "Play beyond\nthe ordinary.", color = Color.White, fontSize = 26.sp, lineHeight = 29.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Your collection, your way", color = Color(0xFFE1E5F2), fontSize = 12.sp)
+    val pc = platform == GamePlatform.PC
+    val shape = RoundedCornerShape(25.dp)
+    Box(
+        Modifier.fillMaxWidth().height(190.dp).clip(shape)
+            .background(Brush.linearGradient(if (pc)
+                listOf(Color(0xFF2F0B12), Color(0xFF14171A), Color(0xFF0B3621))
+                else listOf(Color(0xFF060B13), Color(0xFF103C8A), Color(0xFF07101E))))
+            .border(BorderStroke(1.dp, palette.accent.copy(alpha = .30f)), shape)
+    ) {
+        // Radial glows give the banner depth without fighting the text.
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(
+                listOf(if (pc) Color(0xAFFF3846) else Color(0xC8548EFF), Color.Transparent),
+                center = Offset(60f, 100f), radius = 520f
+            )
+        ))
+        Box(Modifier.fillMaxSize().background(
+            Brush.radialGradient(
+                listOf(if (pc) Color(0xAA79F645) else Color(0x75E3F5FF), Color.Transparent),
+                center = Offset(940f, 280f), radius = 600f
+            )
+        ))
+        Box(Modifier.fillMaxSize().background(
+            Brush.horizontalGradient(listOf(Color(0xB30B0E14), Color(0x550A1019), Color.Transparent))
+        ))
+        Column(Modifier.align(Alignment.BottomStart).padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(if (pc) "PC LIBRARY" else "PS5 LIBRARY", color = if (pc) Color(0xFFFFB0A4) else Color(0xFFD7EEFF),
+                fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.ExtraBold)
+            Text(if (pc) "The world of\nPC gaming" else "Play has\nno limits",
+                color = Color.White, fontSize = 27.sp, lineHeight = 30.sp,
+                fontWeight = FontWeight.ExtraBold)
         }
     }
 }

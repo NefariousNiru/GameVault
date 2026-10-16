@@ -7,7 +7,20 @@ import java.util.Locale
 /** All lifecycle dimensions are independent; skipping stages is supported. */
 enum class ReleaseStatus(val label: String) { TBA("TBA"), ANNOUNCED("Announced"), UPCOMING("Upcoming"), RELEASED("Released") }
 enum class InterestStatus(val label: String) { WISHLIST("Wishlist"), PLANNED("Planned"), DEFERRED("Deferred"), SKIPPED("Skipped") }
-enum class Ps5Acquisition(val label: String) { NOT_OWNED("Not owned"), PREORDERED("Preordered"), PURCHASED("Purchased") }
+/**
+ * Source of access to a PS5 game. Values are persisted by enum name.
+ * Keep legacy PURCHASED to read older GameVault collections without migration.
+ * Subscription access is not necessarily permanent ownership.
+ */
+enum class Ps5Acquisition(val label: String) {
+    NOT_OWNED("Not yet available to me"),
+    PREORDERED("Preordered"),
+    PURCHASED("Purchased"),
+    DIGITAL("Bought digitally"),
+    DISC("Physical disc"),
+    PS_PLUS("PlayStation Plus"),
+    FREE_TO_PLAY("Free to play")
+}
 enum class Ps5Library(val label: String) { NOT_ADDED("Not added"), IN_LIBRARY("In library") }
 enum class PcAcquisition(val label: String) { NOT_DOWNLOADED("Not downloaded"), DOWNLOADED("Downloaded"), INSTALLED("Installed") }
 enum class GameplayStatus(val label: String) { NOT_STARTED("Not started"), PLAYING("Playing"), ON_HOLD("On hold"), COMPLETED("Completed"), DROPPED("Dropped") }

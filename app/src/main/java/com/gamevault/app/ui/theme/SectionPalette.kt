@@ -3,7 +3,7 @@ package com.gamevault.app.ui.theme
 import androidx.compose.ui.graphics.Color
 import com.gamevault.app.domain.model.GamePlatform
 
-/** Section-level colors used until an individual game's artwork takes precedence. */
+/** Each top-level section has an independent, contrast-aware color identity. */
 data class SectionPalette(
     val accent: Color,
     val glow: Color,
@@ -13,24 +13,43 @@ data class SectionPalette(
 )
 
 object VaultPalettes {
+    // PC: AMD red meets NVIDIA green, grounded in near-black graphite.
     val pc = SectionPalette(
-        Color(0xFFB49BFF), Color(0xFF7453ED),
-        Color(0xFF090D1B), Color(0xFF13102A), "PC LIBRARY"
-    )
-    val ps5 = SectionPalette(
-        Color(0xFF72BAFF), Color(0xFF306BF1),
-        Color(0xFF071223), Color(0xFF0E1B3A), "PLAYSTATION 5"
-    )
-    val queue = SectionPalette(
-        Color(0xFFFFC588), Color(0xFFFF8955),
-        Color(0xFF151016), Color(0xFF221724), "THE NEXT CHAPTER"
-    )
-    val settings = SectionPalette(
-        Color(0xFFB8C9E9), Color(0xFF536A8F),
-        Color(0xFF090D17), Color(0xFF121924), "YOUR SPACE"
+        accent = Color(0xFFFF6667),
+        glow = Color(0xFF8AE34D),
+        background = Color(0xFF190D12),
+        secondBackground = Color(0xFF0C211B),
+        label = "PC LIBRARY"
     )
 
-    fun forPlatform(platform: GamePlatform) = when (platform) {
+    // PlayStation: Sony blue + clean white typography against midnight black.
+    val ps5 = SectionPalette(
+        accent = Color(0xFF8CCBFF),
+        glow = Color(0xFF286BFF),
+        background = Color(0xFF050B18),
+        secondBackground = Color(0xFF123A75),
+        label = "PS5 LIBRARY"
+    )
+
+    // A warm amber/sunset identity distinguishes the universal queue.
+    val queue = SectionPalette(
+        accent = Color(0xFFFFC28A),
+        glow = Color(0xFFE26A56),
+        background = Color(0xFF190F16),
+        secondBackground = Color(0xFF352018),
+        label = "PLAY QUEUE"
+    )
+
+    // Distinct muted teal/silver for account settings.
+    val settings = SectionPalette(
+        accent = Color(0xFF9CE5DE),
+        glow = Color(0xFF397F91),
+        background = Color(0xFF08151C),
+        secondBackground = Color(0xFF1B303A),
+        label = "SETTINGS"
+    )
+
+    fun forPlatform(platform: GamePlatform): SectionPalette = when (platform) {
         GamePlatform.PC -> pc
         GamePlatform.PS5 -> ps5
     }
