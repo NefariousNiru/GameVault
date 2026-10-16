@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -242,22 +241,21 @@ private fun VaultBottomNavigation(
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val dockBrush = Brush.verticalGradient(listOf(palette.dockTop, palette.dockBottom))
 
-    Box(
+    // Do not draw a full-width rectangular dock behind this row. The old
+    // background leaked through the transparent corners of the rounded shape,
+    // especially on the PC, PS5 and Settings palettes. Clip the *only* dock
+    // surface, including the navigation-bar inset, before painting its gradient.
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
             .background(dockBrush)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(dockBrush)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
-                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp + navBottom),
+            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp + navBottom),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
-        ) {
-            VaultDestination.entries.forEach { destination ->
+    ) {
+        VaultDestination.entries.forEach { destination ->
                 val active = destination == selected
                 val tint = if (active) palette.accent else Color(0xFF90A0B3)
                 Row(
@@ -286,7 +284,6 @@ private fun VaultBottomNavigation(
                         )
                     }
                 }
-            }
         }
     }
 }

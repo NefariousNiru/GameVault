@@ -1,16 +1,30 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Never commit Android build products or workstation-specific settings
+.gradle/
+**/build/
 local.properties
-.idea
+.idea/
+*.iml
+.externalNativeBuild/
+.cxx/
+
+# Firebase project configuration (provide locally / via CI secret)
+app/google-services.json
+**/google-services.json
+
+# Release signing materials, passwords and temporary outputs
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+.env
+.env.*
+.release/
+dist/
+*.apk
+*.aab
+
+# Local tooling and Python
+__pycache__/
+*.pyc
+node_modules/

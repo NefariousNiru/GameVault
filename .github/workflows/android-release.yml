@@ -1,0 +1,115 @@
+name: Android release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (must match versionName, e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+      publish:
+        description: "Publish the signed APK to GitHub Releases after build and verification"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 45
+    env:
+      GV_RELEASE_STORE_FILE: ${{ github.workspace }}/.release/gamevault-release.p12
+      GV_RELEASE_STORE_PASSWORD: ${{ secrets.GV_KEYSTORE_PASSWORD }}
+      GV_RELEASE_KEY_ALIAS: ${{ secrets.GV_KEY_ALIAS }}
+      GV_RELEASE_KEY_PASSWORD: ${{ secrets.GV_KEY_PASSWORD }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Install Android SDK tools
+        uses: android-actions/setup-android@v3
+
+      # The shared source ZIP intentionally does not include a Gradle wrapper JAR.
+      # setup-gradle supplies the pinned Gradle version directly.
+      - name: Install Gradle 9.6.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Install Android 37 SDK platform
+        run: sdkmanager --install 'platforms;android-37'
+
+      - name: Verify release tag and all required secrets
+        env:
+          GV_KEYSTORE_BASE64: ${{ secrets.GV_KEYSTORE_BASE64 }}
+          GV_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GV_GOOGLE_SERVICES_JSON_BASE64 }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Bad release tag'; exit 1; }
+          VERSION="${RELEASE_TAG#v}"
+          grep -Fq "versionName = \"${VERSION}\"" app/build.gradle.kts || {
+            echo 'Tag and app versionName do not match'; exit 1;
+          }
+          for item in GV_KEYSTORE_BASE64 GV_GOOGLE_SERVICES_JSON_BASE64 GV_RELEASE_STORE_PASSWORD GV_RELEASE_KEY_ALIAS GV_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!item:-}" ]]; then echo "Missing GitHub Actions secret: ${item}"; exit 1; fi
+          done
+          mkdir -p .release
+          umask 077
+          printf '%s' "$GV_KEYSTORE_BASE64" | base64 --decode > "$GV_RELEASE_STORE_FILE"
+          printf '%s' "$GV_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
+          python3 -m json.tool app/google-services.json >/dev/null
+          test -s "$GV_RELEASE_STORE_FILE"
+
+      - name: Run unit tests and compile a signed release
+        run: gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace
+
+      - name: Verify signature and prepare downloads
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          source tools/release_helpers.sh
+          APK="$(locate_release_apk)"
+          verify_release_signature "$APK"
+          mkdir -p dist
+          cp "$APK" "dist/GameVault-${RELEASE_TAG}.apk"
+          (cd dist && sha256sum "GameVault-${RELEASE_TAG}.apk" > "GameVault-${RELEASE_TAG}.apk.sha256")
+
+      - name: Upload APK for testing (including dry runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamevault-signed-${{ inputs.tag }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release (only when requested)
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # Refuse to overwrite an existing public release.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite"; exit 1
+          fi
+          gh release create "$RELEASE_TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "GameVault $RELEASE_TAG" \
+            --generate-notes
+
+      - name: Delete temporary signing and Firebase files
+        if: always()
+        run: rm -f .release/gamevault-release.p12 app/google-services.json

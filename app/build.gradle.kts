@@ -5,6 +5,16 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// Signing credentials are supplied only from local environment variables or
+// GitHub Actions secrets. They must never be committed to this repository.
+val signingStoreFile = providers.environmentVariable("GV_RELEASE_STORE_FILE").orNull
+val signingStorePassword = providers.environmentVariable("GV_RELEASE_STORE_PASSWORD").orNull
+val signingKeyAlias = providers.environmentVariable("GV_RELEASE_KEY_ALIAS").orNull
+val signingKeyPassword = providers.environmentVariable("GV_RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(
+    signingStoreFile, signingStorePassword, signingKeyAlias, signingKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.gamevault.app"
     compileSdk { version = release(37) }
@@ -14,12 +24,26 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("gamevaultRelease") {
+                storeFile = file(requireNotNull(signingStoreFile))
+                storePassword = requireNotNull(signingStorePassword)
+                keyAlias = requireNotNull(signingKeyAlias)
+                keyPassword = requireNotNull(signingKeyPassword)
+            }
+        }
     }
 
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("gamevaultRelease")
+            }
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
@@ -34,6 +58,22 @@ android {
     }
     buildFeatures { compose = true }
 }
+
+// Never emit an accidentally unsigned release if someone calls assembleRelease
+// without the signing environment. The debug build remains usable without it.
+val releaseSigningReady = hasReleaseSigning &&
+    signingStoreFile?.let { file(it).isFile } == true
+val checkReleaseSigning = tasks.register("checkReleaseSigning") {
+    doLast {
+        check(releaseSigningReady) {
+            "Release signing is missing. Set GV_RELEASE_STORE_FILE, " +
+                "GV_RELEASE_STORE_PASSWORD, GV_RELEASE_KEY_ALIAS, and " +
+                "GV_RELEASE_KEY_PASSWORD before assembling a release."
+        }
+    }
+}
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }
+    .configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
