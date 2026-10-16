@@ -40,9 +40,7 @@ fun QueueScreen(games: List<Game>) {
         item { VaultBrand(iconColor = palette.accent) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("THE NEXT CHAPTER", color = palette.accent, fontSize = 10.sp, letterSpacing = 3.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Your play queue", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 31.sp)
-
+                Text("Play Queue", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 31.sp)
             }
         }
         if (queued.isEmpty()) {
@@ -52,15 +50,14 @@ fun QueueScreen(games: List<Game>) {
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Icon(painterResource(R.drawable.gv_ic_queue), null, tint = palette.accent, modifier = Modifier.size(48.dp))
                         Text("The adventure starts here", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("You've added ${games.size} games to your library. Queue actions and drag-to-reorder arrive in Phase 6.",
+                        Text("Games you queue will appear here.",
                             color = VaultMuted, fontSize = 13.sp, lineHeight = 21.sp)
-                        Text("0 GAMES QUEUED", color = palette.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 }
             }
         } else {
             items(queued, key = { it.id }) { game ->
-                Row(Modifier.fillMaxWidth().background(Color(0xFF21202D), RoundedCornerShape(17.dp)).padding(18.dp),
+                Row(Modifier.fillMaxWidth().background(Color(0xCC24161A), RoundedCornerShape(17.dp)).padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
                     Text("${(game.draft.queueRank ?: 0L) + 1}", color = palette.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Column {

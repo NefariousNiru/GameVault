@@ -84,9 +84,7 @@ fun SettingsScreen(
         item { VaultBrand(iconColor = palette.accent) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("SETTINGS", color = palette.accent, fontSize = 10.sp,
-                    letterSpacing = 3.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Settings", color = Color.White, fontSize = 31.sp,
+                Text("Settings", color = Color.White, fontSize = 38.sp,
                     fontWeight = FontWeight.Bold)
             }
         }

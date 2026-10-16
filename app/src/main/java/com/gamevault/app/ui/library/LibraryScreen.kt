@@ -1,15 +1,11 @@
 package com.gamevault.app.ui.library
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.TextButton
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,12 +23,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +61,6 @@ import com.gamevault.app.ui.theme.SectionPalette
 import com.gamevault.app.ui.theme.VaultMuted
 import com.gamevault.app.ui.theme.VaultPalettes
 
-/** Real Firestore-driven collection, with no fabricated sample games. */
 @Composable
 fun LibraryScreen(
     platform: GamePlatform,
@@ -72,19 +70,22 @@ fun LibraryScreen(
     onOpen: (Game) -> Unit
 ) {
     val palette = VaultPalettes.forPlatform(platform)
-    val context = LocalContext.current
     var query by rememberSaveable { mutableStateOf("") }
     var viewGrid by rememberSaveable { mutableStateOf(true) }
     var filter by rememberSaveable { mutableStateOf("All") }
-    var sortNewFirst by rememberSaveable { mutableStateOf(false) }
+    var sortMode by rememberSaveable { mutableStateOf(GameSort.TITLE_ASC) }
+    var sortExpanded by rememberSaveable { mutableStateOf(false) }
+
     val visibleGames = state.games.filter { game ->
-        game.draft.platform == platform && game.draft.title.contains(query.trim(), ignoreCase = true) && when (filter) {
-            "Playing" -> game.draft.gameplay == GameplayStatus.PLAYING
-            "Completed" -> game.draft.gameplay == GameplayStatus.COMPLETED
-            "Wishlist" -> game.draft.interest.name == "WISHLIST"
-            else -> true
-        }
-    }.let { list -> if (sortNewFirst) list.sortedByDescending { it.updatedAtMillis } else list.sortedBy { it.draft.title.lowercase() } }
+        game.draft.platform == platform &&
+            game.draft.title.contains(query.trim(), ignoreCase = true) &&
+            when (filter) {
+                "Playing" -> game.draft.gameplay == GameplayStatus.PLAYING
+                "Completed" -> game.draft.gameplay == GameplayStatus.COMPLETED
+                "Wishlist" -> game.draft.interest.name == "WISHLIST"
+                else -> true
+            }
+    }.let { sortedGames(it, sortMode) }
     val libraryCount = state.games.count { it.draft.platform == platform }
 
     LazyVerticalGrid(
@@ -96,62 +97,154 @@ fun LibraryScreen(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) { VaultBrand(iconColor = palette.accent) }
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("The Collection", fontSize = 31.sp, lineHeight = 38.sp,
-                    color = Color.White, fontWeight = FontWeight.ExtraBold)
-            }
+            Text(
+                "The Collection",
+                fontSize = 25.sp,
+                lineHeight = 30.sp,
+                color = palette.accent,
+                fontWeight = FontWeight.ExtraBold
+            )
         }
         item(span = { GridItemSpan(maxLineSpan) }) { PlatformSwitcher(platform, onPlatformChanged) }
         item(span = { GridItemSpan(maxLineSpan) }) { LibraryHero(platform, palette) }
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Column {
                     Text("Games", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text(if (platform == GamePlatform.PC) "PC titles" else "PlayStation 5 titles", color = VaultMuted, fontSize = 12.sp)
+                    Text(
+                        if (platform == GamePlatform.PC) "PC titles" else "PlayStation 5 titles",
+                        color = VaultMuted,
+                        fontSize = 12.sp
+                    )
                 }
-                Text("$libraryCount GAMES", color = palette.accent, fontSize = 11.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "$libraryCount GAMES",
+                    color = palette.accent,
+                    fontSize = 11.sp,
+                    letterSpacing = 1.3.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             Button(
-                onClick = onAdd, modifier = Modifier.fillMaxWidth().height(50.dp),
+                onClick = onAdd,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(15.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color(0xFF0C1020))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = palette.accent,
+                    contentColor = Color(0xFF0C1020)
+                )
             ) { Text("＋  Add a game", fontWeight = FontWeight.ExtraBold) }
         }
         if (state.games.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 OutlinedTextField(
-                    value = query, onValueChange = { query = it },
-                    label = { Text("Search your library") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)
+                    value = query,
+                    onValueChange = { query = it },
+                    leadingIcon = { Text("⌕", fontSize = 24.sp, color = palette.accent) },
+                    placeholder = { Text("Search your games") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(17.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = palette.accent,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.20f),
+                        focusedContainerColor = Color(0xEE172234),
+                        unfocusedContainerColor = Color(0xCC121C2B),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedPlaceholderColor = VaultMuted,
+                        unfocusedPlaceholderColor = VaultMuted
+                    )
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     listOf("All", "Playing", "Completed", "Wishlist").forEach { option ->
                         FilterChip(
-                            selected = filter == option, onClick = { filter = option },
-                            label = { Text(option, fontSize = 10.sp) }
+                            selected = filter == option,
+                            onClick = { filter = option },
+                            label = { Text(option, fontSize = 12.sp) },
+                            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                containerColor = Color(0xFF172131),
+                                labelColor = Color(0xFFD7E0EE),
+                                selectedContainerColor = palette.accent.copy(alpha = .24f),
+                                selectedLabelColor = Color.White
+                            ),
+                            border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = filter == option,
+                                borderColor = Color.White.copy(alpha = .14f),
+                                selectedBorderColor = palette.accent.copy(alpha = .56f)
+                            )
                         )
                     }
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = viewGrid, onClick = { viewGrid = true }, label = { Text("Grid") })
-                        FilterChip(selected = !viewGrid, onClick = { viewGrid = false }, label = { Text("List") })
+                        FilterChip(
+                            selected = viewGrid,
+                            onClick = { viewGrid = true },
+                            label = { Text("Grid") },
+                            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                containerColor = Color(0xFF172131),
+                                labelColor = Color(0xFFD7E0EE),
+                                selectedContainerColor = palette.accent.copy(alpha = .20f),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                        FilterChip(
+                            selected = !viewGrid,
+                            onClick = { viewGrid = false },
+                            label = { Text("List") },
+                            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                containerColor = Color(0xFF172131),
+                                labelColor = Color(0xFFD7E0EE),
+                                selectedContainerColor = palette.accent.copy(alpha = .20f),
+                                selectedLabelColor = Color.White
+                            )
+                        )
                     }
-                    FilterChip(selected = sortNewFirst, onClick = { sortNewFirst = !sortNewFirst }, label = { Text(if (sortNewFirst) "Recent ↓" else "A–Z") })
+                    Box {
+                        FilterChip(
+                            selected = true,
+                            onClick = { sortExpanded = true },
+                            label = { Text(sortMode.label, fontSize = 12.sp) },
+                            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = palette.accent.copy(alpha = .18f),
+                                selectedLabelColor = Color.White,
+                                containerColor = Color(0xFF172131),
+                                labelColor = Color.White
+                            )
+                        )
+                        DropdownMenu(
+                            expanded = sortExpanded,
+                            onDismissRequest = { sortExpanded = false },
+                            containerColor = Color(0xFF1A2435)
+                        ) {
+                            GameSort.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label, color = Color.White) },
+                                    onClick = { sortMode = option; sortExpanded = false }
+                                )
+                            }
+                        }
+                    }
                 }
-            }
-        }
-        if (state.games.any { it.draft.rawgId != null }) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                TextButton(onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://rawg.io/")))
-                }) { Text("Game details supplied by RAWG ↗", fontSize = 12.sp) }
             }
         }
         if (state.loading) {
@@ -159,10 +252,28 @@ fun LibraryScreen(
         } else if (visibleGames.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 GlowCard(palette) {
-                    Column(Modifier.fillMaxWidth().padding(27.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(painterResource(R.drawable.gv_ic_library), null, tint = palette.accent, modifier = Modifier.size(39.dp))
-                        Text(if (libraryCount == 0) "Make your first entry" else "No matches found", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(if (libraryCount == 0) "Tap Add a game to build your personal collection." else "Try a different search or filter.", color = VaultMuted, fontSize = 12.sp)
+                    Column(
+                        Modifier.fillMaxWidth().padding(27.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.gv_ic_library),
+                            null,
+                            tint = palette.accent,
+                            modifier = Modifier.size(39.dp)
+                        )
+                        Text(
+                            if (libraryCount == 0) "Make your first entry" else "No matches found",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            if (libraryCount == 0) "Tap Add a game to build your collection." else "Try a different search or filter.",
+                            color = VaultMuted,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }
@@ -180,7 +291,7 @@ private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, 
     val shape = RoundedCornerShape(17.dp)
     Row(
         modifier = Modifier.fillMaxWidth().clip(shape)
-            .background(Color(0xFF1B2334))
+            .background(Color(0xCC182133))
             .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
             .clickable(onClick = onClick).padding(if (grid) 0.dp else 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -190,11 +301,19 @@ private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, 
             Box(
                 modifier = if (grid) Modifier.fillMaxWidth().aspectRatio(.76f) else Modifier.size(width = 77.dp, height = 104.dp).clip(shape)
             ) {
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(palette.glow.copy(alpha = .5f), Color(0xFF121726)))))
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(palette.glow.copy(alpha = .55f), Color(0xFF121726)))))
                 if (draft.coverUrl.isNotBlank()) AsyncImage(
-                    model = draft.coverUrl, contentDescription = "${draft.title} cover", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                    model = draft.coverUrl,
+                    contentDescription = "${draft.title} cover",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 ) else Icon(painterResource(R.drawable.gv_ic_library), null, Modifier.align(Alignment.Center).size(46.dp), tint = palette.accent)
-                if (grid) Text(draft.platform.label, modifier = Modifier.align(Alignment.TopEnd).padding(9.dp).background(Color(0xDD121522), RoundedCornerShape(6.dp)).padding(horizontal = 7.dp, vertical = 4.dp), color = Color.White, fontSize = 10.sp)
+                if (grid) Text(
+                    draft.platform.label,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(9.dp).background(Color(0xDD121522), RoundedCornerShape(6.dp)).padding(horizontal = 7.dp, vertical = 4.dp),
+                    color = Color.White,
+                    fontSize = 10.sp
+                )
             }
             if (grid) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -216,8 +335,10 @@ private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, 
 
 @Composable
 private fun PlatformSwitcher(selected: GamePlatform, onSelect: (GamePlatform) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF171C2B)).padding(5.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xCC171C2B)).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         GamePlatform.entries.forEach { platform ->
             val active = platform == selected
             val color = VaultPalettes.forPlatform(platform).accent
@@ -226,9 +347,15 @@ private fun PlatformSwitcher(selected: GamePlatform, onSelect: (GamePlatform) ->
                     .background(if (active) color.copy(alpha = .16f) else Color.Transparent)
                     .border(BorderStroke(1.dp, if (active) color.copy(alpha = .4f) else Color.Transparent), RoundedCornerShape(14.dp))
                     .clickable { onSelect(platform) }.padding(vertical = 13.dp),
-                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(painterResource(if (platform == GamePlatform.PC) R.drawable.gv_ic_pc else R.drawable.gv_ic_ps5), null, Modifier.size(19.dp), tint = if (active) color else VaultMuted)
+                Icon(
+                    painterResource(if (platform == GamePlatform.PC) R.drawable.gv_ic_pc else R.drawable.gv_ic_ps5),
+                    null,
+                    Modifier.size(19.dp),
+                    tint = if (active) color else VaultMuted
+                )
                 Spacer(Modifier.size(8.dp))
                 Text(platform.label, color = if (active) Color.White else VaultMuted, fontWeight = FontWeight.Bold)
             }
@@ -236,41 +363,43 @@ private fun PlatformSwitcher(selected: GamePlatform, onSelect: (GamePlatform) ->
     }
 }
 
-/** Cinematic platform banner rendered in Compose; no network images required. */
 @Composable
 private fun LibraryHero(platform: GamePlatform, palette: SectionPalette) {
     val pc = platform == GamePlatform.PC
     val shape = RoundedCornerShape(25.dp)
     Box(
-        Modifier.fillMaxWidth().height(190.dp).clip(shape)
-            .background(Brush.linearGradient(if (pc)
-                listOf(Color(0xFF2F0B12), Color(0xFF14171A), Color(0xFF0B3621))
-                else listOf(Color(0xFF060B13), Color(0xFF103C8A), Color(0xFF07101E))))
-            .border(BorderStroke(1.dp, palette.accent.copy(alpha = .30f)), shape)
+        Modifier.fillMaxWidth().height(194.dp).clip(shape)
+            .background(palette.background)
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = .18f)), shape)
     ) {
-        // Radial glows give the banner depth without fighting the text.
+        Image(
+            painter = painterResource(if (pc) R.drawable.gv_banner_pc else R.drawable.gv_banner_ps5),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alignment = if (pc) Alignment.CenterStart else Alignment.CenterEnd
+        )
         Box(Modifier.fillMaxSize().background(
-            Brush.radialGradient(
-                listOf(if (pc) Color(0xAFFF3846) else Color(0xC8548EFF), Color.Transparent),
-                center = Offset(60f, 100f), radius = 520f
+            Brush.horizontalGradient(listOf(Color(0xD708101C), Color(0x9608101C), Color.Transparent))
+        ))
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text(
+                if (pc) "PC LIBRARY" else "PS5 LIBRARY",
+                color = palette.accent,
+                fontSize = 11.sp,
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.ExtraBold
             )
-        ))
-        Box(Modifier.fillMaxSize().background(
-            Brush.radialGradient(
-                listOf(if (pc) Color(0xAA79F645) else Color(0x75E3F5FF), Color.Transparent),
-                center = Offset(940f, 280f), radius = 600f
+            Text(
+                if (pc) "The World of\nPC Gaming" else "Play Has\nNo Limits",
+                color = Color.White,
+                fontSize = 27.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.ExtraBold
             )
-        ))
-        Box(Modifier.fillMaxSize().background(
-            Brush.horizontalGradient(listOf(Color(0xB30B0E14), Color(0x550A1019), Color.Transparent))
-        ))
-        Column(Modifier.align(Alignment.BottomStart).padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text(if (pc) "PC LIBRARY" else "PS5 LIBRARY", color = if (pc) Color(0xFFFFB0A4) else Color(0xFFD7EEFF),
-                fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.ExtraBold)
-            Text(if (pc) "The world of\nPC gaming" else "Play has\nno limits",
-                color = Color.White, fontSize = 27.sp, lineHeight = 30.sp,
-                fontWeight = FontWeight.ExtraBold)
         }
     }
 }

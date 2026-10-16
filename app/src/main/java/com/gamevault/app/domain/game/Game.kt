@@ -59,7 +59,8 @@ data class Game(
     val id: String,
     val titleKey: String,
     val draft: GameDraft,
-    val updatedAtMillis: Long
+    val updatedAtMillis: Long,
+    val createdAtMillis: Long = updatedAtMillis
 )
 
 /** Title normalization keeps duplicate detection consistent across app sessions. */

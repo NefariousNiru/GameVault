@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -93,6 +94,8 @@ fun GameEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetGesturesEnabled = true,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
         containerColor = Color(0xFF121725),
         contentColor = Color.White
     ) {
@@ -105,10 +108,8 @@ fun GameEditorSheet(
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(if (game == null) "ADD A GAME" else "EDIT GAME", color = accent,
                         fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Text(if (game == null) "A new adventure" else "Curate this game",
+                    Text(if (game == null) "Add a game" else "Edit game",
                         fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Find a title to fill its details, or enter one yourself.",
-                        color = VaultMuted, fontSize = 12.sp)
                 }
             }
             item {
@@ -119,19 +120,18 @@ fun GameEditorSheet(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("GAME TITLE", color = accent, fontSize = 11.sp,
+                    Text("TITLE", color = accent, fontSize = 11.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-                    Text("Choose a game in the search above to fill this automatically. You can also type a name yourself.",
-                        color = VaultMuted, fontSize = 12.sp, lineHeight = 17.sp)
+
                     OutlinedTextField(
                         value = draft.title,
-                        onValueChange = { draft = draft.copy(title = it) },
+                        onValueChange = { if (draft.rawgId == null) draft = draft.copy(title = it) },
+                        readOnly = draft.rawgId != null,
                         label = { Text("Title *") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true, shape = RoundedCornerShape(15.dp),
                         supportingText = {
-                            Text(if (draft.rawgId != null) "Matched with RAWG game details · name can be customized"
-                                else "Manual game · search above for automatic details")
+                            if (draft.rawgId != null) Text("Selected from search")
                         }
                     )
                 }
@@ -155,7 +155,7 @@ fun GameEditorSheet(
             item { HorizontalDivider(color = Color.White.copy(alpha = 0.10f)) }
             item {
                 OutlinedButton(onClick = { showAdvanced = !showAdvanced }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (showAdvanced) "Hide your game progress ▲" else "Your game progress and preferences ▼")
+                    Text(if (showAdvanced) "Hide your details ↑" else "Your game details ↓")
                 }
             }
             if (showAdvanced) {
@@ -184,13 +184,13 @@ fun GameEditorSheet(
             item { EditorText("Completion date (YYYY-MM-DD)", draft.completionDate) { draft = draft.copy(completionDate = it) } }
             item { OutlinedTextField(draft.notes, { draft = draft.copy(notes = it) }, label = { Text("Personal notes") }, minLines = 3, maxLines = 7, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) }
             } // personal statuses/details
-            item {
+            if (draft.rawgId == null) item {
                 OutlinedButton(onClick = { showCatalogFields = !showCatalogFields }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (showCatalogFields) "Hide game information ▲" else "Game information · optional edits ▼")
+                    Text(if (showCatalogFields) "Hide game information ↑" else "Game information ↓")
                 }
             }
-            if (showCatalogFields) {
-                item { Text("GAME INFORMATION", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            if (showCatalogFields && draft.rawgId == null) {
+                item { Text("OPTIONAL DETAILS", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 item { EditorText("Developer", draft.developer) { draft = draft.copy(developer = it) } }
                 item { EditorText("Publisher", draft.publisher) { draft = draft.copy(publisher = it) } }
                 item { EditorText("Genres (comma-separated)", draft.genres) { draft = draft.copy(genres = it) } }
@@ -199,8 +199,7 @@ fun GameEditorSheet(
                 item { EditorText("Release date (YYYY-MM-DD)", draft.releaseDate) { draft = draft.copy(releaseDate = it) } }
                 item { OutlinedTextField(draft.description, { draft = draft.copy(description = it) }, label = { Text("Game description") }, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 8) }
             }
-            item { Text("ARTWORK (OPTIONAL)", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-            item { Text("Cover art appears in your library. Background art colors the entire game details screen. Pick an image below or paste an HTTPS link.", color = VaultMuted, fontSize = 12.sp) }
+            item { Text("ARTWORK", color = accent, letterSpacing = 2.sp, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             item {
                 ArtworkOptionRow("Portrait covers", choices.covers, draft.coverUrl,
                     { userCoverChanged = true; draft = draft.copy(coverUrl = it) }, portrait = true)
@@ -217,7 +216,7 @@ fun GameEditorSheet(
             }
             item { EditorText("HTTPS cover image URL", draft.coverUrl) { userCoverChanged = true; draft = draft.copy(coverUrl = it) } }
             item { EditorText("HTTPS background image URL", draft.heroUrl) { userHeroChanged = true; draft = draft.copy(heroUrl = it) } }
-            item { Text("Game details supplied by RAWG · Artwork from SteamGridDB. Source links appear on the game page.", color = VaultMuted, fontSize = 11.sp) }
+
             if (error != null) item { Text(error, color = Color(0xFFFFA6A6), fontSize = 13.sp) }
             item {
                 Button(

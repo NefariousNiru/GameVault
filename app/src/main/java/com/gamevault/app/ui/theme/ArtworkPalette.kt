@@ -27,7 +27,7 @@ object ArtworkPalette {
      * analogous companion. Darkened swatches keep white content readable.
      */
     suspend fun mood(bitmap: Bitmap, fallback: SectionPalette): ArtworkMood = withContext(Dispatchers.Default) {
-        val palette = Palette.from(bitmap).resizeBitmapSize(160).maximumColorCount(18).generate()
+        val palette = Palette.from(bitmap).resizeBitmapArea(160 * 160).maximumColorCount(18).generate()
         val primary = (palette.vibrantSwatch ?: palette.darkVibrantSwatch
             ?: palette.mutedSwatch ?: palette.dominantSwatch)?.rgb
             ?: return@withContext ArtworkMood.fallback(fallback)
