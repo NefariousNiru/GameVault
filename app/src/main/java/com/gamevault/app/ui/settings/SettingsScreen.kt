@@ -20,7 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,8 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gamevault.app.data.backup.FirestoreBackupStore
@@ -75,7 +72,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     var rawgKey by remember(apiKeys.rawg) { mutableStateOf(apiKeys.rawg) }
     var steamKey by remember(apiKeys.steamGridDb) { mutableStateOf(apiKeys.steamGridDb) }
-    var revealKeys by remember { mutableStateOf(false) }
     val dirty = rawgKey.trim() != apiKeys.rawg || steamKey.trim() != apiKeys.steamGridDb
 
     // Display once per successful write, even if the stored settings Flow emits again.
@@ -120,33 +116,14 @@ fun SettingsScreen(
                     Text("Add your own API keys to unlock game search and artwork choices.",
                         color = VaultMuted, fontSize = 13.sp, lineHeight = 19.sp)
 
-                    ApiProviderLink("Search games", "RAWG", "Get a RAWG API key ↗") {
-                        context.startActivity(Intent(Intent.ACTION_VIEW,
-                            Uri.parse("https://rawg.io/apidocs")))
-                    }
-                    OutlinedTextField(
-                        value = rawgKey, onValueChange = { rawgKey = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("RAWG API key") }, singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        visualTransformation = if (revealKeys) VisualTransformation.None else PasswordVisualTransformation()
+                    ApiKeyEditorFields(
+                        rawgKey = rawgKey,
+                        onRawgKeyChange = { rawgKey = it },
+                        steamKey = steamKey,
+                        onSteamKeyChange = { steamKey = it },
+                        accent = palette.accent,
+                        showPrivacyNote = false
                     )
-
-                    HorizontalDivider(color = Color.White.copy(alpha = .09f))
-                    ApiProviderLink("Display game artwork", "SteamGridDB", "Get a SteamGridDB API key ↗") {
-                        context.startActivity(Intent(Intent.ACTION_VIEW,
-                            Uri.parse("https://www.steamgriddb.com/profile/preferences/api")))
-                    }
-                    OutlinedTextField(
-                        value = steamKey, onValueChange = { steamKey = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("SteamGridDB API key") }, singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        visualTransformation = if (revealKeys) VisualTransformation.None else PasswordVisualTransformation()
-                    )
-                    TextButton(onClick = { revealKeys = !revealKeys }) {
-                        Text(if (revealKeys) "Hide keys" else "Show keys", color = palette.accent)
-                    }
                     Button(
                         onClick = { onSaveApiKeys(rawgKey.trim(), steamKey.trim()) },
                         enabled = dirty && !apiSettingsSaving,
@@ -248,17 +225,6 @@ fun SettingsScreen(
                 Spacer(Modifier.size(8.dp))
                 Text("Sign out")
             }
-        }
-    }
-}
-
-@Composable
-private fun ApiProviderLink(title: String, provider: String, link: String, onLink: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        Text(provider, color = VaultMuted, fontSize = 12.sp)
-        TextButton(onClick = onLink, modifier = Modifier.padding(start = 0.dp)) {
-            Text(link, fontSize = 12.sp)
         }
     }
 }

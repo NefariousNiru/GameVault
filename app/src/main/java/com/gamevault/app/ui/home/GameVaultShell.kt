@@ -57,6 +57,7 @@ import com.gamevault.app.ui.game.GameLibraryViewModel
 import com.gamevault.app.ui.library.LibraryScreen
 import com.gamevault.app.ui.queue.QueueScreen
 import com.gamevault.app.ui.settings.SettingsScreen
+import com.gamevault.app.ui.settings.ApiKeyOnboardingDialog
 import com.gamevault.app.ui.theme.SectionPalette
 import com.gamevault.app.ui.theme.VaultPalettes
 import kotlinx.coroutines.launch
@@ -71,7 +72,13 @@ fun GameVaultShell(
     val container = (LocalContext.current.applicationContext as GameVaultApplication).container
     val gamesViewModel: GameLibraryViewModel = viewModel(factory = GameLibraryViewModel.Factory(container.gameRepository))
     val state by gamesViewModel.state.collectAsStateWithLifecycle()
-    val apiKeys by container.apiKeySettings.keys.collectAsStateWithLifecycle(initialValue = CatalogKeys())
+    // Wait for DataStore's real value before opening the setup dialog so
+    // upgrading users see their existing device-local keys prefilled.
+    val loadedKeysFlow = androidx.compose.runtime.remember(container) {
+        container.apiKeySettings.keys.map<CatalogKeys, CatalogKeys?> { it }
+    }
+    val loadedKeys by loadedKeysFlow.collectAsStateWithLifecycle(initialValue = null)
+    val apiKeys = loadedKeys ?: CatalogKeys()
     val keysScope = rememberCoroutineScope()
     var apiSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
     var apiSettingsSaving by rememberSaveable { mutableStateOf(false) }
@@ -93,6 +100,12 @@ fun GameVaultShell(
             }
     }
 
+
+    // Device-install-scoped: persists across sign-out and app restarts,
+    // but Android does not back up noBackupFilesDir, so reinstall shows it again.
+    var showApiKeyWelcome by rememberSaveable {
+        mutableStateOf(!container.apiKeyOnboardingStore.hasCompleted())
+    }
 
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -210,6 +223,18 @@ fun GameVaultShell(
                 }
             }
         }
+    }
+
+    if (showApiKeyWelcome && loadedKeys != null) {
+        ApiKeyOnboardingDialog(
+            currentKeys = apiKeys,
+            onSave = { rawg, steam ->
+                container.apiKeySettings.save(rawg, steam)
+                container.apiKeyOnboardingStore.markCompleted()
+            },
+            onLater = { container.apiKeyOnboardingStore.markCompleted() },
+            onComplete = { showApiKeyWelcome = false }
+        )
     }
 
     if (showEditor) {
