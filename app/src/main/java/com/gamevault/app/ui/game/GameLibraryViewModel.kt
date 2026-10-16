@@ -6,15 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.gamevault.app.domain.game.Game
 import com.gamevault.app.domain.game.GameDraft
 import com.gamevault.app.domain.game.GameRepository
+import com.gamevault.app.domain.game.QuickStatusField
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class GameLibraryUiState(
     val games: List<Game> = emptyList(),
+    val queueOrder: List<String> = emptyList(),
     val loading: Boolean = true,
     val saving: Boolean = false,
     val error: String? = null
@@ -34,8 +37,10 @@ class GameLibraryViewModel(private val repository: GameRepository) : ViewModel()
         mutable.value = GameLibraryUiState()
         subscription = viewModelScope.launch {
             try {
-                repository.observeGames(uid).collect { games ->
-                    mutable.update { it.copy(games = games, loading = false, error = null) }
+                combine(repository.observeGames(uid), repository.observeQueueOrder(uid)) { games, order ->
+                    games to order
+                }.collect { (games, order) ->
+                    mutable.update { it.copy(games = games, queueOrder = order, loading = false, error = null) }
                 }
             } catch (error: Exception) {
                 mutable.update { it.copy(loading = false, error = error.message ?: "Could not load games") }
@@ -72,6 +77,70 @@ class GameLibraryViewModel(private val repository: GameRepository) : ViewModel()
                 repository.setQueued(uid, game.id, queued)
             } catch (error: Exception) {
                 mutable.update { it.copy(error = error.message ?: "Could not update queue") }
+            } finally {
+                mutable.update { it.copy(saving = false) }
+            }
+        }
+    }
+
+    /** One atomic reorder after release, never per-frame writes. */
+    fun reorderQueue(orderedIds: List<String>, onResult: (Boolean) -> Unit) {
+        val uid = observedUid
+        if (uid == null || mutable.value.saving) {
+            onResult(false)
+            return
+        }
+        mutable.update { it.copy(saving = true, error = null) }
+        viewModelScope.launch {
+            var successful = false
+            try {
+                repository.reorderQueue(uid, orderedIds)
+                successful = true
+            } catch (error: Exception) {
+                mutable.update { it.copy(error = error.message ?: "Could not reorder queue") }
+            } finally {
+                mutable.update { it.copy(saving = false) }
+                onResult(successful)
+            }
+        }
+    }
+
+    /**
+     * Clear queue membership without deleting games or altering gameplay fields.
+     * Each removal uses the existing, rules-tested transaction to avoid
+     * exceeding Firestore security-rule access limits in a giant batch.
+     * Interrupted clears can safely be retried.
+     */
+    fun clearQueue() {
+        val uid = observedUid ?: return
+        if (mutable.value.saving) return
+        val members = mutable.value.games.filter { it.draft.queueRank != null }
+        if (members.isEmpty()) return
+        mutable.update { it.copy(saving = true, error = null) }
+        viewModelScope.launch {
+            try {
+                members.forEach { repository.setQueued(uid, it.id, false) }
+            } catch (failure: Exception) {
+                mutable.update {
+                    it.copy(error = "Queue partially cleared. Retry to finish: " +
+                        (failure.message ?: "connection interrupted"))
+                }
+            } finally {
+                mutable.update { it.copy(saving = false) }
+            }
+        }
+    }
+
+    /** Partial updates protect other user-owned fields from stale screen state. */
+    fun setQuickStatus(game: Game, field: QuickStatusField, value: String) {
+        val uid = observedUid ?: return
+        if (mutable.value.saving) return
+        mutable.update { it.copy(saving = true, error = null) }
+        viewModelScope.launch {
+            try {
+                repository.updateStatus(uid, game.id, field, value)
+            } catch (error: Exception) {
+                mutable.update { it.copy(error = error.message ?: "Could not update status") }
             } finally {
                 mutable.update { it.copy(saving = false) }
             }

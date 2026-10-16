@@ -20,7 +20,7 @@ import com.gamevault.app.ui.theme.GameVaultTheme
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels {
         val dependencies = (application as GameVaultApplication).container
-        AuthViewModel.Factory(dependencies.authRepository, dependencies.connectionRepository)
+        AuthViewModel.Factory(dependencies.authRepository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,9 +47,6 @@ class MainActivity : ComponentActivity() {
                     GameVaultShell(
                         user = signedIn,
                         busy = uiState.busy,
-                        message = uiState.connectionMessage,
-                        error = uiState.error,
-                        onVerifyCloud = authViewModel::verifyFirestore,
                         onSignOut = { authViewModel.signOut(this) }
                     )
                 }

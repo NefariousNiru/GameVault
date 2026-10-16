@@ -6,6 +6,5 @@ data class AuthUiState(
     val loading: Boolean = true,
     val busy: Boolean = false,
     val user: AuthenticatedUser? = null,
-    val connectionMessage: String? = null,
     val error: String? = null
 )

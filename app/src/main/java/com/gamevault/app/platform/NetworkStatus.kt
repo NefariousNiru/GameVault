@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Reports validated internet access, not merely being associated with Wi-Fi. */
 object NetworkStatus {
+    fun isConnected(context: Context): Boolean {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        return manager.getNetworkCapabilities(manager.activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    }
     fun observe(context: Context): Flow<Boolean> = callbackFlow {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         fun connected(): Boolean {

@@ -53,6 +53,7 @@ import coil3.compose.AsyncImage
 import com.gamevault.app.R
 import com.gamevault.app.domain.game.Game
 import com.gamevault.app.domain.game.GameplayStatus
+import com.gamevault.app.domain.game.QuickStatusField
 import com.gamevault.app.domain.model.GamePlatform
 import com.gamevault.app.ui.components.GlowCard
 import com.gamevault.app.ui.components.VaultBrand
@@ -67,7 +68,8 @@ fun LibraryScreen(
     onPlatformChanged: (GamePlatform) -> Unit,
     state: GameLibraryUiState,
     onAdd: () -> Unit,
-    onOpen: (Game) -> Unit
+    onOpen: (Game) -> Unit,
+    onQuickStatus: (Game, QuickStatusField, String) -> Unit
 ) {
     val palette = VaultPalettes.forPlatform(platform)
     var query by rememberSaveable { mutableStateOf("") }
@@ -279,14 +281,25 @@ fun LibraryScreen(
             }
         } else {
             items(visibleGames, key = { it.id }) { game ->
-                GameLibraryCard(game = game, palette = palette, grid = viewGrid, onClick = { onOpen(game) })
+                GameLibraryCard(
+                    game = game, palette = palette, grid = viewGrid,
+                    onClick = { onOpen(game) },
+                    onPlayStatus = { next -> onQuickStatus(game, QuickStatusField.PLAY_STATUS, next) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, onClick: () -> Unit) {
+private fun GameLibraryCard(
+    game: Game,
+    palette: SectionPalette,
+    grid: Boolean,
+    onClick: () -> Unit,
+    onPlayStatus: (String) -> Unit
+) {
+    var expanded by androidx.compose.runtime.remember(game.id) { mutableStateOf(false) }
     val draft = game.draft
     val shape = RoundedCornerShape(17.dp)
     Row(
@@ -318,14 +331,38 @@ private fun GameLibraryCard(game: Game, palette: SectionPalette, grid: Boolean, 
             if (grid) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(draft.title, maxLines = 2, fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(draft.gameplay.label, color = palette.accent, fontSize = 11.sp)
+                    Box {
+                        Text(
+                            "${draft.gameplay.label}  ▾", color = palette.accent, fontSize = 11.sp,
+                            modifier = Modifier.clickable { expanded = true }
+                        )
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            GameplayStatus.entries.forEach { status ->
+                                DropdownMenuItem(text = { Text(status.label) }, onClick = {
+                                    expanded = false
+                                    if (status != draft.gameplay) onPlayStatus(status.name)
+                                })
+                            }
+                        }
+                    }
                 }
             }
         }
         if (!grid) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(draft.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text("${draft.platform.label} · ${draft.gameplay.label}", color = palette.accent, fontSize = 12.sp)
+                Box {
+                    Text("${draft.platform.label} · ${draft.gameplay.label} ▾", color = palette.accent,
+                        fontSize = 12.sp, modifier = Modifier.clickable { expanded = true })
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        GameplayStatus.entries.forEach { status ->
+                            DropdownMenuItem(text = { Text(status.label) }, onClick = {
+                                expanded = false
+                                if (status != draft.gameplay) onPlayStatus(status.name)
+                            })
+                        }
+                    }
+                }
                 Text(draft.interest.label, color = VaultMuted, fontSize = 11.sp)
             }
             Text("›", modifier = Modifier.padding(end = 11.dp), color = palette.accent, fontSize = 25.sp)

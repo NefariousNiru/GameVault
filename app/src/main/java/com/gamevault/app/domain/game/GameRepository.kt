@@ -5,11 +5,16 @@ import kotlinx.coroutines.flow.Flow
 /** Firestore is authoritative. A single user cannot have two titles with the same normalized name. */
 interface GameRepository {
     fun observeGames(userId: String): Flow<List<Game>>
+    fun observeQueueOrder(userId: String): Flow<List<String>>
     suspend fun create(userId: String, draft: GameDraft)
     suspend fun update(userId: String, game: Game, draft: GameDraft)
     suspend fun delete(userId: String, game: Game)
     /** Queue membership is explicit; lifecycle statuses never imply membership. */
     suspend fun setQueued(userId: String, gameId: String, queued: Boolean)
+    /** Commits a complete new queue order in one transaction when a drag ends. */
+    suspend fun reorderQueue(userId: String, orderedGameIds: List<String>)
+    /** Partial update avoids overwriting independent statuses from other devices. */
+    suspend fun updateStatus(userId: String, gameId: String, field: QuickStatusField, value: String)
 }
 
 class DuplicateGameException : IllegalArgumentException("This title is already in your collection")

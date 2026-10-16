@@ -33,10 +33,17 @@ internal interface SteamGridApi {
                        @Query("types") types: String = "static", @Query("limit") limit: Int = 12): JsonObject
 }
 
-class RemoteGameCatalogRepository : GameCatalogRepository {
-    private val rawg: RawgApi = Retrofit.Builder().baseUrl("https://api.rawg.io/api/")
+class RemoteGameCatalogRepository internal constructor(
+    rawgBaseUrl: String,
+    steamBaseUrl: String
+) : GameCatalogRepository {
+    /** Production callers keep the public zero-argument constructor. */
+    constructor() : this("https://api.rawg.io/api/", "https://www.steamgriddb.com/api/v2/")
+
+    // Injectable hosts allow MockWebServer contract tests without contacting live providers.
+    private val rawg: RawgApi = Retrofit.Builder().baseUrl(rawgBaseUrl)
         .addConverterFactory(GsonConverterFactory.create()).build().create(RawgApi::class.java)
-    private val steam: SteamGridApi = Retrofit.Builder().baseUrl("https://www.steamgriddb.com/api/v2/")
+    private val steam: SteamGridApi = Retrofit.Builder().baseUrl(steamBaseUrl)
         .addConverterFactory(GsonConverterFactory.create()).build().create(SteamGridApi::class.java)
 
     override suspend fun search(query: String, key: String): List<CatalogMatch> {

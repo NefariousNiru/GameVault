@@ -3,15 +3,19 @@ package com.gamevault.app.domain.game
 import com.gamevault.app.domain.model.GamePlatform
 import java.text.Normalizer
 import java.util.Locale
+import kotlinx.serialization.Serializable
 
 /** All lifecycle dimensions are independent; skipping stages is supported. */
+@Serializable
 enum class ReleaseStatus(val label: String) { TBA("TBA"), ANNOUNCED("Announced"), UPCOMING("Upcoming"), RELEASED("Released") }
+@Serializable
 enum class InterestStatus(val label: String) { WISHLIST("Wishlist"), PLANNED("Planned"), DEFERRED("Deferred"), SKIPPED("Skipped") }
 /**
  * Source of access to a PS5 game. Values are persisted by enum name.
  * Keep legacy PURCHASED to read older GameVault collections without migration.
  * Subscription access is not necessarily permanent ownership.
  */
+@Serializable
 enum class Ps5Acquisition(val label: String) {
     NOT_OWNED("Not yet available to me"),
     PREORDERED("Preordered"),
@@ -21,11 +25,15 @@ enum class Ps5Acquisition(val label: String) {
     PS_PLUS("PlayStation Plus"),
     FREE_TO_PLAY("Free to play")
 }
+@Serializable
 enum class Ps5Library(val label: String) { NOT_ADDED("Not added"), IN_LIBRARY("In library") }
+@Serializable
 enum class PcAcquisition(val label: String) { NOT_DOWNLOADED("Not downloaded"), DOWNLOADED("Downloaded"), INSTALLED("Installed") }
+@Serializable
 enum class GameplayStatus(val label: String) { NOT_STARTED("Not started"), PLAYING("Playing"), ON_HOLD("On hold"), COMPLETED("Completed"), DROPPED("Dropped") }
 
 /** Independent, immutable input. Platform-specific values are retained when switching platforms. */
+@Serializable
 data class GameDraft(
     val title: String = "",
     val platform: GamePlatform = GamePlatform.PC,

@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.gamevault.app.domain.game.Game
+import com.gamevault.app.domain.game.GameplayStatus
+import com.gamevault.app.domain.game.InterestStatus
+import com.gamevault.app.domain.game.PcAcquisition
+import com.gamevault.app.domain.game.Ps5Acquisition
+import com.gamevault.app.domain.game.QuickStatusField
 import com.gamevault.app.domain.model.GamePlatform
 import com.gamevault.app.ui.components.GameArtworkBackdrop
 import com.gamevault.app.ui.theme.ArtworkMood
@@ -59,6 +66,7 @@ fun GameDetailScreen(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onToggleQueue: () -> Unit,
+    onQuickStatus: (QuickStatusField, String) -> Unit,
     queueError: String? = null
 ) {
     BackHandler(onBack = onDismiss)
@@ -186,13 +194,26 @@ fun GameDetailScreen(
                 }
                 item {
                     GameInfoPanel("YOUR GAME", mood) {
-                        InfoRow("Play Status", draft.gameplay.label)
-                        InfoRow("Interest", draft.interest.label)
+                        StatusQuickPicker(
+                            "Play Status", draft.gameplay.name,
+                            GameplayStatus.entries.map { it.name to it.label }, busy
+                        ) { onQuickStatus(QuickStatusField.PLAY_STATUS, it) }
+                        StatusQuickPicker(
+                            "Interest", draft.interest.name,
+                            InterestStatus.entries.map { it.name to it.label }, busy
+                        ) { onQuickStatus(QuickStatusField.INTEREST, it) }
                         InfoRow("Your Rating", draft.rating?.let { "$it / 10" } ?: "Not rated")
-                        InfoRow(
-                            if (draft.platform == GamePlatform.PC) "Download Status" else "How You Access It",
-                            if (draft.platform == GamePlatform.PC) draft.pcAcquisition.label else draft.ps5Acquisition.label
-                        )
+                        if (draft.platform == GamePlatform.PC) {
+                            StatusQuickPicker(
+                                "Download Status", draft.pcAcquisition.name,
+                                PcAcquisition.entries.map { it.name to it.label }, busy
+                            ) { onQuickStatus(QuickStatusField.PC_DOWNLOAD, it) }
+                        } else {
+                            StatusQuickPicker(
+                                "How You Access It", draft.ps5Acquisition.name,
+                                Ps5Acquisition.entries.map { it.name to it.label }, busy
+                            ) { onQuickStatus(QuickStatusField.PS5_ACCESS, it) }
+                        }
                         if (draft.completionDate.isNotBlank()) InfoRow("Completed", draft.completionDate)
                         if (draft.notes.isNotBlank()) InfoRow("Notes", draft.notes)
                         InfoRow("Play Queue", if (draft.queueRank == null) "Not queued" else "Queued")
@@ -273,6 +294,33 @@ fun GameDetailScreen(
                         Text("Remove from Library", color = Color(0xFFFFB7BE))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusQuickPicker(
+    label: String,
+    selected: String,
+    options: List<Pair<String, String>>,
+    busy: Boolean,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = VaultMuted, fontSize = 12.sp)
+        OutlinedButton(onClick = { expanded = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Text(options.firstOrNull { it.first == selected }?.second.orEmpty(),
+                color = Color.White, modifier = Modifier.weight(1f))
+            Text("⌄", color = Color.White)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (value, display) ->
+                DropdownMenuItem(text = { Text(display) }, onClick = {
+                    expanded = false
+                    if (value != selected) onSelect(value)
+                })
             }
         }
     }

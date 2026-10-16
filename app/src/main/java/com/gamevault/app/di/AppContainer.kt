@@ -1,9 +1,9 @@
 package com.gamevault.app.di
 
+import com.gamevault.app.data.backup.FirestoreBackupStore
+import com.gamevault.app.data.artwork.ArtworkPrefetcher
 import com.gamevault.app.data.auth.FirebaseGoogleAuthRepository
-import com.gamevault.app.data.diagnostics.FirestoreCloudConnectionRepository
 import com.gamevault.app.domain.auth.AuthRepository
-import com.gamevault.app.domain.diagnostics.CloudConnectionRepository
 import com.gamevault.app.data.game.FirestoreGameRepository
 import com.gamevault.app.domain.game.GameRepository
 import android.content.Context
@@ -18,8 +18,8 @@ class AppContainer(
     context: Context,
     val catalogRepository: GameCatalogRepository = RemoteGameCatalogRepository(),
     val apiKeySettings: ApiKeySettings = ApiKeySettings(context),
-    val gameRepository: GameRepository = FirestoreGameRepository(FirebaseFirestore.getInstance()),
-    val authRepository: AuthRepository = FirebaseGoogleAuthRepository(FirebaseAuth.getInstance()),
-    val connectionRepository: CloudConnectionRepository =
-        FirestoreCloudConnectionRepository(FirebaseFirestore.getInstance())
+    val gameRepository: GameRepository = FirestoreGameRepository(FirebaseFirestore.getInstance(), context.applicationContext),
+    val backupStore: FirestoreBackupStore = FirestoreBackupStore(FirebaseFirestore.getInstance(), context.applicationContext),
+    val artworkPrefetcher: ArtworkPrefetcher = ArtworkPrefetcher(context.applicationContext),
+    val authRepository: AuthRepository = FirebaseGoogleAuthRepository(FirebaseAuth.getInstance())
 )

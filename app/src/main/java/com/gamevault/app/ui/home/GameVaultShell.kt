@@ -32,6 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.gamevault.app.platform.NetworkStatus
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,9 +67,6 @@ import kotlinx.coroutines.launch
 fun GameVaultShell(
     user: AuthenticatedUser,
     busy: Boolean,
-    message: String?,
-    error: String?,
-    onVerifyCloud: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val container = (LocalContext.current.applicationContext as GameVaultApplication).container
@@ -76,6 +78,22 @@ fun GameVaultShell(
     var apiSettingsSaving by rememberSaveable { mutableStateOf(false) }
     var apiSavedCount by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(user.uid) { gamesViewModel.observe(user.uid) }
+    val context = LocalContext.current
+    LaunchedEffect(user.uid) {
+        combine(
+            NetworkStatus.observe(context.applicationContext),
+            gamesViewModel.state.map { it.games }.distinctUntilChanged { old, new ->
+                fun urls(items: List<com.gamevault.app.domain.game.Game>) = items
+                    .flatMap { listOf(it.draft.coverUrl, it.draft.heroUrl) }
+                    .filter { it.isNotBlank() }.distinct().sorted()
+                urls(old) == urls(new)
+            }
+        ) { online, currentGames -> online to currentGames }
+            .collectLatest { (online, currentGames) ->
+                if (online && currentGames.isNotEmpty()) container.artworkPrefetcher.prefetch(currentGames)
+            }
+    }
+
 
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -109,7 +127,8 @@ fun GameVaultShell(
             onToggleQueue = {
                 gamesViewModel.setQueued(detailsGame, detailsGame.draft.queueRank == null)
             },
-            queueError = state.error
+            queueError = state.error,
+            onQuickStatus = { field, value -> gamesViewModel.setQuickStatus(detailsGame, field, value) }
         )
     } else {
         VaultBackdrop(palette) {
@@ -144,30 +163,35 @@ fun GameVaultShell(
                             onOpen = { game ->
                                 gamesViewModel.clearError()
                                 detailId = game.id
-                            }
+                            },
+                            onQuickStatus = { game, field, value -> gamesViewModel.setQuickStatus(game, field, value) }
                         )
                     }
                     composable(VaultDestination.QUEUE.route) {
                         QueueScreen(
                             games = state.games,
+                            queueOrder = state.queueOrder,
                             busy = state.saving,
                             error = state.error,
                             onOpen = { game -> gamesViewModel.clearError(); detailId = game.id },
-                            onRemove = { game -> gamesViewModel.setQueued(game, false) }
+                            onRemove = { game -> gamesViewModel.setQueued(game, false) },
+                            onClearQueue = { gamesViewModel.clearQueue() },
+                            onReorder = { ids, onResult -> gamesViewModel.reorderQueue(ids, onResult) }
                         )
                     }
                     composable(VaultDestination.SETTINGS.route) {
                         SettingsScreen(
                             user = user,
                             busy = busy,
-                            message = message,
-                            error = error,
-                            onVerifyCloud = onVerifyCloud,
                             onSignOut = onSignOut,
                             apiKeys = apiKeys,
                             apiSettingsError = apiSettingsError,
                             apiSettingsSaving = apiSettingsSaving,
                             apiSavedCount = apiSavedCount,
+                            backupGames = state.games,
+                            backupQueueOrder = state.queueOrder,
+                            backupStore = container.backupStore,
+                            artworkPrefetcher = container.artworkPrefetcher,
                             onSaveApiKeys = { rawg, steam ->
                                 apiSettingsError = null
                                 if (!apiSettingsSaving) keysScope.launch {
