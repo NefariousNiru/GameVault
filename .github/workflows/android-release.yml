@@ -52,8 +52,10 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
-      - name: Install Android 37 SDK platform
-        run: sdkmanager --install 'platforms;android-37'
+      - name: Install Android 17 SDK platform (API 37.0)
+        # Android API 37 uses the minor-versioned SDK package name "android-37.0".
+        # There is no "platforms;android-37" package; Gradle must select minorApiLevel=0.
+        run: sdkmanager --install 'platforms;android-37.0' 
 
       - name: Verify release tag and all required secrets
         env:

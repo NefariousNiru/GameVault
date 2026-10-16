@@ -17,7 +17,9 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.gamevault.app"
-    compileSdk { version = release(37) }
+    // Android API 37 SDK platforms use minor-versioned names (e.g., android-37.0).
+    // The minor must be explicit, or AGP may look for nonexistent android-37.
+    compileSdk { version = release(37) { minorApiLevel = 0 } }
 
     defaultConfig {
         applicationId = "com.gamevault.app"
