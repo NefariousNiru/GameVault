@@ -74,6 +74,36 @@ requesting `tools`. To apply the fix to your existing repository, replace
 `.github/workflows/android-release.yml` with the version in this source package, commit, and push it,
 then rerun the workflow **without publishing** first. This is an SDK setup failure, not a Kotlin compile error.
 
+### Android 17 SDK package naming (API 37.0)
+
+Android API 37's SDK platform is distributed as **`platforms;android-37.0`**, not
+`platforms;android-37`. A GitHub Actions run using the old SDK package string
+fails with `Failed to find package 'platforms;android-37'` before Gradle starts.
+
+The workflow installs `sdkmanager --install 'platforms;android-37.0'`, and the app's
+`compileSdk` explicitly requests the minor release:
+
+```kotlin
+compileSdk { version = release(37) { minorApiLevel = 0 } }
+```
+
+Both changes are necessary: merely installing 37.0 while leaving `release(37)`
+without the `minorApiLevel` selector can make Gradle look for `android-37`.
+No downgrade of AGP, Kotlin, Java, or Android SDK is required. An SDK Manager
+message stating that `sdkmanager` is deprecated is a **warning**, not the failure.
+
+### Gradle configuration-cache compatibility (release signing guard)
+
+If the GitHub build reaches `:app:assembleRelease` but fails with
+`Task :app:checkReleaseSigning ... cannot serialize Gradle script object references`,
+update `app/build.gradle.kts` and add `tools/check_release_signing.sh` from this
+source package. The previous custom `doLast` task captured the Kotlin build script,
+which Gradle 9.6 cannot store in its configuration cache. The replacement uses
+Gradle's built-in, configuration-cache-compatible `Exec` task to run the signing
+preflight before final assembly. It still checks that the required signing
+variables are set and the keystore exists. **Do not disable the configuration
+cache or remove the signing guard.**
+
 ### Build locally, instead
 
 Once your working project has Android SDK, Gradle (or a real Gradle wrapper JAR), a permanent keystore, and `app/google-services.json`:

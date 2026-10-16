@@ -61,18 +61,15 @@ android {
     buildFeatures { compose = true }
 }
 
-// Never emit an accidentally unsigned release if someone calls assembleRelease
-// without the signing environment. The debug build remains usable without it.
-val releaseSigningReady = hasReleaseSigning &&
-    signingStoreFile?.let { file(it).isFile } == true
-val checkReleaseSigning = tasks.register("checkReleaseSigning") {
-    doLast {
-        check(releaseSigningReady) {
-            "Release signing is missing. Set GV_RELEASE_STORE_FILE, " +
-                "GV_RELEASE_STORE_PASSWORD, GV_RELEASE_KEY_ALIAS, and " +
-                "GV_RELEASE_KEY_PASSWORD before assembling a release."
-        }
-    }
+// Never emit an accidentally unsigned release. A Gradle Exec task can be
+// serialized by the configuration cache; a doLast closure referencing this
+// Gradle Kotlin script cannot (Gradle 9.6 rejects script-object captures).
+// The preflight receives credentials only through the process environment.
+val checkReleaseSigning = tasks.register<org.gradle.api.tasks.Exec>("checkReleaseSigning") {
+    group = "verification"
+    description = "Require the permanent signing keystore before a release build"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "tools/check_release_signing.sh")
 }
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }
     .configureEach { dependsOn(checkReleaseSigning) }
