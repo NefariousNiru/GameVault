@@ -14,6 +14,8 @@ A beautiful, personal game collection for Android — built for people who play 
 
 **[Get GameVault for Android](https://github.com/NefariousNiru/GameVault/releases)** · **[Connect on LinkedIn](https://www.linkedin.com/in/nbroy/)**
 
+*The first signed Android APK will appear on GitHub Releases once final device testing and signing are complete.*
+
 </div>
 
 ---
@@ -40,7 +42,7 @@ A beautiful, personal game collection for Android — built for people who play 
 
 ## Get started
 
-1. **Install the Android APK** from [GitHub Releases](https://github.com/NefariousNiru/GameVault/releases) once the first release is published. Android 8.0+ is supported.
+1. **Install the direct `.apk` file** from [GitHub Releases](https://github.com/NefariousNiru/GameVault/releases) once the first release is published—**not** the GitHub source-code ZIP. Each release provides a separate `SHA256SUMS.txt` and shows the APK checksum in the release notes for verification. Android 8.0+ is supported.
 2. **Sign in with Google.** Your collection is associated with your account.
 3. **Highly recommended: add your free-tier RAWG and SteamGridDB API keys** under **Settings → Game Search & Artwork**. They unlock the best experience with title suggestions, metadata and artwork choices.
 4. Add a game to PC or PS5, set its statuses, and start building your Play Queue.

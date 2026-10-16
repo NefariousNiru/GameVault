@@ -82,7 +82,7 @@ jobs:
       - name: Run unit tests and compile a signed release
         run: gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace
 
-      - name: Verify signature and prepare downloads
+      - name: Verify signature and prepare direct APK and SHA-256 downloads
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
@@ -90,32 +90,44 @@ jobs:
           source tools/release_helpers.sh
           APK="$(locate_release_apk)"
           verify_release_signature "$APK"
-          mkdir -p dist
-          cp "$APK" "dist/GameVault-${RELEASE_TAG}.apk"
-          (cd dist && sha256sum "GameVault-${RELEASE_TAG}.apk" > "GameVault-${RELEASE_TAG}.apk.sha256")
+          bash tools/prepare_release_assets.sh "$RELEASE_TAG" "$APK"
 
-      - name: Upload APK for testing (including dry runs)
+      # Workflow artifacts are for internal testing and may be ZIP-wrapped by GitHub.
+      # The PUBLIC release below uploads the actual .apk, not an artifact ZIP.
+      - name: Upload signed APK and checksum for testing (including dry runs)
         uses: actions/upload-artifact@v4
         with:
           name: gamevault-signed-${{ inputs.tag }}
-          path: dist/*
+          path: |
+            dist/GameVault-${{ inputs.tag }}.apk
+            dist/SHA256SUMS.txt
           if-no-files-found: error
 
-      - name: Publish GitHub Release (only when requested)
+      - name: Publish direct APK and checksum to GitHub Releases (only when requested)
         if: ${{ inputs.publish }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          # Refuse to overwrite an existing public release.
+          # Refuse to silently replace an existing public release.
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists; refusing to overwrite"; exit 1
           fi
-          gh release create "$RELEASE_TAG" dist/* \
+          APK_NAME="GameVault-${RELEASE_TAG}.apk"
+          (cd dist && sha256sum --check SHA256SUMS.txt)
+          # EXACTLY two release assets: the installable APK and its checksum.
+          # release-notes.md supplies an inline SHA-256 hash and direct download link.
+          gh release create "$RELEASE_TAG" \
+            "dist/${APK_NAME}" \
+            "dist/SHA256SUMS.txt" \
             --target "$GITHUB_SHA" \
             --title "GameVault $RELEASE_TAG" \
-            --generate-notes
+            --notes-file dist/release-notes.md
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
+          # Check GitHub actually attached both named assets.
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$APK_NAME"
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq 'SHA256SUMS.txt'
 
       - name: Delete temporary signing and Firebase files
         if: always()

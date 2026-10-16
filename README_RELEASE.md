@@ -61,7 +61,7 @@ From the GitHub repository's **Actions** tab:
 1. Select **Android release APK** → **Run workflow**.
 2. Enter tag `v1.0.0` and leave **publish = false** for the first run. The workflow runs unit tests, builds the release, verifies the APK's signing certificate, and exposes the signed APK as a downloadable workflow artifact for device testing.
 3. Install that APK on a clean test device, sign in, check sync, play queue, backup/import, offline mode, and both Settings links. A different release signing key from the old debug version requires uninstall first (see step 1).
-4. Once the signed build is confirmed, rerun the workflow with **publish = true**, tag `v1.0.0`. It publishes `GameVault-v1.0.0.apk` and its `.sha256` checksum to [GitHub Releases](https://github.com/NefariousNiru/GameVault/releases). Repeated use of the same release tag is intentionally blocked; bump `versionCode` and `versionName` for the next version.
+4. Once the signed build is confirmed, rerun the workflow with **publish = true**, tag `v1.0.0`. It publishes **two direct Release assets** to [GitHub Releases](https://github.com/NefariousNiru/GameVault/releases): `GameVault-v1.0.0.apk` (installable APK, not ZIP) and `SHA256SUMS.txt`. The Release description also shows the APK's actual SHA-256 hash and a direct APK download link. Repeated use of the same release tag is intentionally blocked; bump `versionCode` and `versionName` for the next version.
 
 Workflow needs Actions enabled, repository write access, and permission to create GitHub releases. If repository policy prevents `GITHUB_TOKEN` from creating releases, download the signed APK artifact and publish it manually as a release asset.
 
@@ -114,6 +114,20 @@ bash tools/build_release_local.sh
 ```
 
 The script asks for the signing path/passwords without embedding them in tracked files, runs JVM unit tests and `assembleRelease`, and verifies the signature with Android `apksigner`. Use the **same keystore** for CI and every later release.
+
+### APK download versus workflow artifact
+
+GitHub Actions **run artifacts** under the Actions tab may be downloaded as ZIP archives. Those are for testing; they are **not** the public installer. With **publish = true**, the workflow attaches the actual `GameVault-v1.0.0.apk` file directly to the GitHub Release, alongside `SHA256SUMS.txt`. GitHub also displays automatically generated "Source code (zip)" and "Source code (tar.gz)" links on release pages; these are source snapshots, not the installable Android app.
+
+From the folder containing the two downloaded release files, check the APK integrity using:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+The same SHA-256 is printed in the Release description. The workflow verifies the signed APK with `apksigner` before uploading and double-checks that both Release assets are present.
+
+**If you already published `v1.0.0`:** The publish workflow intentionally refuses to replace an existing release. Running the new workflow again with `publish = true` will not overwrite it. To add the new checksum/direct APK to an existing release, inspect the current assets first and explicitly upload the verified files with `gh release upload v1.0.0 ... --clobber`, then edit the release description. Do not publish a second APK signed with a different certificate.
 
 ## 6. Release acceptance / future updates
 
