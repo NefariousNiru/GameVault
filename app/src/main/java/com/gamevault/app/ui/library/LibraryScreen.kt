@@ -67,15 +67,17 @@ fun LibraryScreen(
     platform: GamePlatform,
     onPlatformChanged: (GamePlatform) -> Unit,
     state: GameLibraryUiState,
+    preferences: LibraryDisplayPreferences,
+    onPreferencesChange: (LibraryDisplayPreferences) -> Unit,
     onAdd: () -> Unit,
     onOpen: (Game) -> Unit,
     onQuickStatus: (Game, QuickStatusField, String) -> Unit
 ) {
     val palette = VaultPalettes.forPlatform(platform)
-    var query by rememberSaveable { mutableStateOf("") }
-    var viewGrid by rememberSaveable { mutableStateOf(true) }
-    var filter by rememberSaveable { mutableStateOf("All") }
-    var sortMode by rememberSaveable { mutableStateOf(GameSort.TITLE_ASC) }
+    val query = preferences.query
+    val viewGrid = preferences.grid
+    val filter = preferences.filter
+    val sortMode = preferences.sort
     var sortExpanded by rememberSaveable { mutableStateOf(false) }
 
     val visibleGames = state.games.filter { game ->
@@ -147,7 +149,7 @@ fun LibraryScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { onPreferencesChange(preferences.copy(query = it)) },
                     leadingIcon = { Text("⌕", fontSize = 24.sp, color = palette.accent) },
                     placeholder = { Text("Search your games") },
                     singleLine = true,
@@ -173,7 +175,7 @@ fun LibraryScreen(
                     listOf("All", "Playing", "Completed", "Wishlist").forEach { option ->
                         FilterChip(
                             selected = filter == option,
-                            onClick = { filter = option },
+                            onClick = { onPreferencesChange(preferences.copy(filter = option)) },
                             label = { Text(option, fontSize = 12.sp) },
                             colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                                 containerColor = Color(0xFF172131),
@@ -200,7 +202,7 @@ fun LibraryScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = viewGrid,
-                            onClick = { viewGrid = true },
+                            onClick = { onPreferencesChange(preferences.copy(grid = true)) },
                             label = { Text("Grid") },
                             colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                                 containerColor = Color(0xFF172131),
@@ -211,7 +213,7 @@ fun LibraryScreen(
                         )
                         FilterChip(
                             selected = !viewGrid,
-                            onClick = { viewGrid = false },
+                            onClick = { onPreferencesChange(preferences.copy(grid = false)) },
                             label = { Text("List") },
                             colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                                 containerColor = Color(0xFF172131),
@@ -241,7 +243,7 @@ fun LibraryScreen(
                             GameSort.entries.forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text(option.label, color = Color.White) },
-                                    onClick = { sortMode = option; sortExpanded = false }
+                                    onClick = { onPreferencesChange(preferences.copy(sort = option)); sortExpanded = false }
                                 )
                             }
                         }

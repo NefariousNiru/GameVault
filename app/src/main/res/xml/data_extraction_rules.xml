@@ -2,10 +2,12 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/catalog_credentials.preferences_pb" />
+        <exclude domain="file" path="datastore/gamevault_local_display.preferences_pb" />
         <exclude domain="file" path="gamevault_artwork/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/catalog_credentials.preferences_pb" />
+        <exclude domain="file" path="datastore/gamevault_local_display.preferences_pb" />
         <exclude domain="file" path="gamevault_artwork/" />
     </device-transfer>
 </data-extraction-rules>

@@ -8,6 +8,7 @@ import com.gamevault.app.data.game.FirestoreGameRepository
 import com.gamevault.app.domain.game.GameRepository
 import android.content.Context
 import com.gamevault.app.data.catalog.ApiKeyOnboardingStore
+import com.gamevault.app.data.preferences.LocalDisplayPreferencesStore
 import com.gamevault.app.data.catalog.ApiKeySettings
 import com.gamevault.app.data.catalog.RemoteGameCatalogRepository
 import com.gamevault.app.domain.catalog.GameCatalogRepository
@@ -19,6 +20,7 @@ class AppContainer(
     context: Context,
     val catalogRepository: GameCatalogRepository = RemoteGameCatalogRepository(),
     val apiKeySettings: ApiKeySettings = ApiKeySettings(context),
+    val localDisplayPreferences: LocalDisplayPreferencesStore = LocalDisplayPreferencesStore(context),
     val apiKeyOnboardingStore: ApiKeyOnboardingStore = ApiKeyOnboardingStore(context),
     val gameRepository: GameRepository = FirestoreGameRepository(FirebaseFirestore.getInstance(), context.applicationContext),
     val backupStore: FirestoreBackupStore = FirestoreBackupStore(FirebaseFirestore.getInstance(), context.applicationContext),

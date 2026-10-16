@@ -19,8 +19,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +59,7 @@ import com.gamevault.app.ui.game.GameDetailScreen
 import com.gamevault.app.ui.game.GameEditorSheet
 import com.gamevault.app.ui.game.GameLibraryViewModel
 import com.gamevault.app.ui.library.LibraryScreen
+import com.gamevault.app.ui.library.LocalDisplayPreferences
 import com.gamevault.app.ui.queue.QueueScreen
 import com.gamevault.app.ui.settings.SettingsScreen
 import com.gamevault.app.ui.settings.ApiKeyOnboardingDialog
@@ -72,6 +77,21 @@ fun GameVaultShell(
     val container = (LocalContext.current.applicationContext as GameVaultApplication).container
     val gamesViewModel: GameLibraryViewModel = viewModel(factory = GameLibraryViewModel.Factory(container.gameRepository))
     val state by gamesViewModel.state.collectAsStateWithLifecycle()
+    // Explicit on-device DataStore preferences: load BEFORE mounting the library
+    // so a cold restart cannot overwrite the saved sort/filter with defaults.
+    val displayPreferencesFlow = remember(container, user.uid) {
+        container.localDisplayPreferences.settings(user.uid)
+            .map<LocalDisplayPreferences, LocalDisplayPreferences?> { it }
+    }
+    val storedDisplayPreferences by displayPreferencesFlow.collectAsStateWithLifecycle(initialValue = null)
+    var localDisplayPreferences by remember(user.uid) { mutableStateOf<LocalDisplayPreferences?>(null) }
+    var initialLibraryRoute by remember(user.uid) { mutableStateOf<String?>(null) }
+    LaunchedEffect(user.uid, storedDisplayPreferences) {
+        if (localDisplayPreferences == null && storedDisplayPreferences != null) {
+            initialLibraryRoute = storedDisplayPreferences?.route
+            localDisplayPreferences = storedDisplayPreferences
+        }
+    }
     // Wait for DataStore's real value before opening the setup dialog so
     // upgrading users see their existing device-local keys prefilled.
     val loadedKeysFlow = androidx.compose.runtime.remember(container) {
@@ -80,6 +100,16 @@ fun GameVaultShell(
     val loadedKeys by loadedKeysFlow.collectAsStateWithLifecycle(initialValue = null)
     val apiKeys = loadedKeys ?: CatalogKeys()
     val keysScope = rememberCoroutineScope()
+    val changeDisplayPreferences: ((LocalDisplayPreferences) -> LocalDisplayPreferences) -> Unit = { change ->
+        val previous = localDisplayPreferences
+        if (previous != null) {
+            val next = change(previous)
+            if (next != previous) {
+                localDisplayPreferences = next // update UI immediately, before the disk write
+                keysScope.launch { container.localDisplayPreferences.save(user.uid, next) }
+            }
+        }
+    }
     var apiSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
     var apiSettingsSaving by rememberSaveable { mutableStateOf(false) }
     var apiSavedCount by rememberSaveable { mutableIntStateOf(0) }
@@ -109,8 +139,8 @@ fun GameVaultShell(
 
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
-    val route = backStack?.destination?.route ?: VaultDestination.LIBRARY.route
-    var platform by rememberSaveable { mutableStateOf(GamePlatform.PC) }
+    val route = backStack?.destination?.route ?: localDisplayPreferences?.route ?: VaultDestination.LIBRARY.route
+    val platform = localDisplayPreferences?.platform ?: GamePlatform.PC
     var showEditor by rememberSaveable { mutableStateOf(false) }
     var editId by rememberSaveable { mutableStateOf<String?>(null) }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -123,8 +153,22 @@ fun GameVaultShell(
         else -> VaultPalettes.forPlatform(platform)
     }
     val current = VaultDestination.entries.firstOrNull { it.route == route } ?: VaultDestination.LIBRARY
+    // Also persist navigation caused by the system Back button, not only dock taps.
+    LaunchedEffect(route, localDisplayPreferences != null) {
+        if (localDisplayPreferences != null && localDisplayPreferences?.route != route) {
+            changeDisplayPreferences { it.copy(route = route) }
+        }
+    }
 
-    if (detailId != null && detailsGame != null) {
+    if (localDisplayPreferences == null) {
+        // Only the device-local preference read is pending. Never briefly show
+        // default sorting before restoring a user's actual view choices.
+        VaultBackdrop(palette) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = palette.accent)
+            }
+        }
+    } else if (detailId != null && detailsGame != null) {
         GameDetailScreen(
             game = detailsGame,
             busy = state.saving,
@@ -149,6 +193,7 @@ fun GameVaultShell(
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
                     VaultBottomNavigation(palette, current) { destination ->
+                        changeDisplayPreferences { it.copy(route = destination.route) }
                         navController.navigate(destination.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
@@ -159,14 +204,20 @@ fun GameVaultShell(
             ) { insets ->
                 NavHost(
                     navController = navController,
-                    startDestination = VaultDestination.LIBRARY.route,
+                    startDestination = initialLibraryRoute ?: VaultDestination.LIBRARY.route,
                     modifier = Modifier.padding(insets)
                 ) {
                     composable(VaultDestination.LIBRARY.route) {
                         LibraryScreen(
                             platform = platform,
-                            onPlatformChanged = { platform = it },
+                            onPlatformChanged = { selected ->
+                                changeDisplayPreferences { it.copy(platform = selected) }
+                            },
                             state = state,
+                            preferences = localDisplayPreferences!!.forPlatform(platform),
+                            onPreferencesChange = { selected ->
+                                changeDisplayPreferences { it.withPlatformPreferences(platform, selected) }
+                            },
                             onAdd = {
                                 gamesViewModel.clearError()
                                 editId = null
@@ -225,7 +276,7 @@ fun GameVaultShell(
         }
     }
 
-    if (showApiKeyWelcome && loadedKeys != null) {
+    if (showApiKeyWelcome && loadedKeys != null && localDisplayPreferences != null) {
         ApiKeyOnboardingDialog(
             currentKeys = apiKeys,
             onSave = { rawg, steam ->

@@ -164,7 +164,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("OFFLINE ARTWORK", color = palette.accent,
                         fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("Save album art and cover images for viewing without internet.",
+                    Text("Automatic offline artwork caching is on by default. Use this button to cache your full library now.",
                         color = VaultMuted, fontSize = 13.sp)
                     OutlinedButton(
                         onClick = {
